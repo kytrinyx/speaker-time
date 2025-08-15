@@ -8,28 +8,48 @@ def main():
     if len(sys.argv) != 2:
         print("Usage: speaker-time <audio_file>")
         sys.exit(1)
-    
+
     file_path = sys.argv[1]
     absolute_path = os.path.abspath(file_path)
-    
+
     # Initialize pyannote pipeline
     hf_token = os.getenv("HUGGINGFACE_SPEAKER_DIARIZATION")
     if not hf_token:
         print("Error: HUGGINGFACE_SPEAKER_DIARIZATION environment variable not set")
         sys.exit(1)
-    
+
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=hf_token)
-    
+
     # Run speaker diarization
     diarization = pipeline(absolute_path)
-    
-    # Count unique speakers
-    speakers = set()
+
+    # Calculate speaking time and first occurrence for each speaker
+    speaker_times = {}
+    speaker_first_occurrence = {}
+
     for segment, _, speaker in diarization.itertracks(yield_label=True):
-        speakers.add(speaker)
-    
+        duration = segment.duration
+        start_time = segment.start
+
+        if speaker in speaker_times:
+            speaker_times[speaker] += duration
+        else:
+            speaker_times[speaker] = duration
+            speaker_first_occurrence[speaker] = start_time
+
     print(f"File: {absolute_path}")
-    print(f"Number of speakers: {len(speakers)}")
+    print(f"Number of speakers: {len(speaker_times)}")
+    print()
+
+    for speaker, time in speaker_times.items():
+        minutes = int(time // 60)
+        seconds = int(time % 60)
+
+        first_occurrence = speaker_first_occurrence[speaker]
+        first_min = int(first_occurrence // 60)
+        first_sec = int(first_occurrence % 60)
+
+        print(f"{speaker}: {minutes}m {seconds}s ({time:.1f}s total) - first speaks at {first_min}m {first_sec}s")
 
 if __name__ == "__main__":
     main()
