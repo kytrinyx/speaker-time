@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+from pyannote.audio import Pipeline
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: speaker-time <audio_file>")
+        sys.exit(1)
+    
+    file_path = sys.argv[1]
+    absolute_path = os.path.abspath(file_path)
+    
+    # Initialize pyannote pipeline
+    hf_token = os.getenv("HUGGINGFACE_SPEAKER_DIARIZATION")
+    if not hf_token:
+        print("Error: HUGGINGFACE_SPEAKER_DIARIZATION environment variable not set")
+        sys.exit(1)
+    
+    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=hf_token)
+    
+    # Run speaker diarization
+    diarization = pipeline(absolute_path)
+    
+    # Count unique speakers
+    speakers = set()
+    for segment, _, speaker in diarization.itertracks(yield_label=True):
+        speakers.add(speaker)
+    
+    print(f"File: {absolute_path}")
+    print(f"Number of speakers: {len(speakers)}")
+
+if __name__ == "__main__":
+    main()
