@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import csv
+
+def format_timestamp(seconds):
+    """Convert seconds to VTT timestamp format (HH:MM:SS.mmm)."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: create-vtt <basename>")
+        print("Example: create-vtt sample")
+        sys.exit(1)
+
+    basename = sys.argv[1]
+    
+    # Construct paths
+    transcription_file = os.path.join("output", basename, "transcription.csv")
+    vtt_file = os.path.join("output", basename, f"{basename}.vtt")
+    
+    # Check if transcription file exists
+    if not os.path.exists(transcription_file):
+        print(f"Error: Transcription file not found: {transcription_file}")
+        sys.exit(1)
+    
+    # Read transcription CSV
+    segments = []
+    with open(transcription_file, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            # Skip empty or timeout segments
+            text = row['text'].strip()
+            if text and text != "[TIMEOUT]":
+                segments.append({
+                    'start': float(row['start_time']),
+                    'end': float(row['end_time']),
+                    'text': text
+                })
+    
+    # Generate VTT file
+    with open(vtt_file, 'w') as f:
+        f.write("WEBVTT\n\n")
+        
+        for i, segment in enumerate(segments, 1):
+            start_time = format_timestamp(segment['start'])
+            end_time = format_timestamp(segment['end'])
+            
+            f.write(f"{start_time} --> {end_time}\n")
+            f.write(f"{segment['text']}\n\n")
+    
+    print(f"VTT file created: {vtt_file}")
+    print(f"Generated {len(segments)} subtitle entries")
+
+if __name__ == "__main__":
+    main()
