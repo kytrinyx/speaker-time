@@ -2,6 +2,7 @@
 
 import sys
 import os
+import csv
 from pyannote.audio import Pipeline
 
 def main():
@@ -23,33 +24,46 @@ def main():
     # Run speaker diarization
     diarization = pipeline(absolute_path)
 
-    # Calculate speaking time and first occurrence for each speaker
-    speaker_times = {}
-    speaker_first_occurrence = {}
-
+    # Collect all segments for timeline processing
+    segments = []
     for segment, _, speaker in diarization.itertracks(yield_label=True):
-        duration = segment.duration
-        start_time = segment.start
+        segments.append({
+            'speaker': speaker,
+            'start': segment.start,
+            'end': segment.end
+        })
 
-        if speaker in speaker_times:
-            speaker_times[speaker] += duration
-        else:
-            speaker_times[speaker] = duration
-            speaker_first_occurrence[speaker] = start_time
+    # Sort segments by start time
+    segments.sort(key=lambda x: x['start'])
 
-    print(f"File: {absolute_path}")
-    print(f"Number of speakers: {len(speaker_times)}")
-    print()
+    # Resolve overlapping segments (assign to original speaker)
+    resolved_segments = []
+    for segment in segments:
+        # Check for overlaps with existing resolved segments
+        overlapping = False
+        for existing in resolved_segments:
+            if (segment['start'] < existing['end'] and segment['end'] > existing['start']):
+                # Overlap detected - keep the original speaker's segment
+                overlapping = True
+                break
+        
+        if not overlapping:
+            resolved_segments.append(segment)
 
-    for speaker, time in speaker_times.items():
-        minutes = int(time // 60)
-        seconds = int(time % 60)
+    # Generate output CSV filename
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    csv_filename = f"{base_name}_timeline.csv"
 
-        first_occurrence = speaker_first_occurrence[speaker]
-        first_min = int(first_occurrence // 60)
-        first_sec = int(first_occurrence % 60)
+    # Write timeline to CSV
+    with open(csv_filename, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['SPEAKER_ID', 'start_time', 'end_time'])
+        
+        for segment in resolved_segments:
+            writer.writerow([segment['speaker'], segment['start'], segment['end']])
 
-        print(f"{speaker}: {minutes}m {seconds}s ({time:.1f}s total) - first speaks at {first_min}m {first_sec}s")
+    print(f"Timeline saved to: {csv_filename}")
+    print(f"Total segments: {len(resolved_segments)}")
 
 if __name__ == "__main__":
     main()
