@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import csv
+import json
+import ffmpeg
+import whisper
+
+def find_contiguous_segments(segments, gap_threshold=3.0):
+    """Group segments by speaker and find contiguous periods within gap threshold."""
+    speaker_groups = {}
+
+    # Group segments by speaker
+    for segment in segments:
+        speaker = segment['speaker']
+        if speaker not in speaker_groups:
+            speaker_groups[speaker] = []
+        speaker_groups[speaker].append(segment)
+
+    # Find contiguous periods for each speaker
+    contiguous_periods = {}
+    for speaker, speaker_segments in speaker_groups.items():
+        periods = []
+        current_period = [speaker_segments[0]]
+
+        for i in range(1, len(speaker_segments)):
+            gap = speaker_segments[i]['start'] - current_period[-1]['end']
+
+            if gap <= gap_threshold:
+                # Continue current period
+                current_period.append(speaker_segments[i])
+            else:
+                # Start new period
+                periods.append(current_period)
+                current_period = [speaker_segments[i]]
+
+        # Add the last period
+        periods.append(current_period)
+        contiguous_periods[speaker] = periods
+
+    return contiguous_periods
+
+def find_best_sample_combination(periods, target_min=30, target_max=60):
+    """Find the best combination of contiguous periods to reach target duration."""
+    # Sort periods by total duration (largest first)
+    period_durations = []
+    for period in periods:
+        duration = sum(seg['end'] - seg['start'] for seg in period)
+        period_durations.append((period, duration))
+
+    period_durations.sort(key=lambda x: x[1], reverse=True)
+
+    # Try to find combination that fits target
+    best_combination = []
+    current_duration = 0
+
+    for period, duration in period_durations:
+        if current_duration + duration <= target_max:
+            best_combination.extend(period)
+            current_duration += duration
+
+            if current_duration >= target_min:
+                break
+
+    # Return segments sorted by time
+    if current_duration >= target_min:
+        best_combination.sort(key=lambda x: x['start'])
+        return best_combination
+
+    return None
+
+def create_combined_audio_sample(segments, audio_file_path, output_filename):
+    """Create a single audio file from multiple segments."""
+    if not segments:
+        return
+
+    # If only one segment, extract directly
+    if len(segments) == 1:
+        seg = segments[0]
+        stream = ffmpeg.input(audio_file_path, ss=seg['start'], to=seg['end'])
+        ffmpeg.output(stream, output_filename).run(overwrite_output=True, quiet=True)
+        return
+
+    # For multiple segments, concatenate them
+    inputs = []
+    for seg in segments:
+        duration = seg['end'] - seg['start']
+        segment_stream = ffmpeg.input(audio_file_path, ss=seg['start'], t=duration)
+        inputs.append(segment_stream)
+
+    # Concatenate all segments
+    joined = ffmpeg.concat(*inputs, v=0, a=1)
+    ffmpeg.output(joined, output_filename).run(overwrite_output=True, quiet=True)
+
+def generate_language_samples(segments, audio_file_path, output_dir):
+    """Generate 20-60 second audio samples for language detection."""
+    print("Generating language detection samples...")
+
+    # Find contiguous segments
+    contiguous_periods = find_contiguous_segments(segments)
+
+    # Create language detection subdirectory
+    lang_dir = os.path.join(output_dir, "language_detection")
+    os.makedirs(lang_dir, exist_ok=True)
+
+    generated_samples = {}
+
+    for speaker, periods in contiguous_periods.items():
+        # Calculate total speaking time for this speaker
+        total_duration = sum(seg['end'] - seg['start'] for seg in segments if seg['speaker'] == speaker)
+
+        # Skip speakers with less than 20 seconds total
+        if total_duration < 20:
+            print(f"Skipping {speaker}: only {total_duration:.1f}s total speaking time")
+            continue
+
+        # Find best combination of periods to get 20-60 seconds
+        best_sample = find_best_sample_combination(periods, target_min=20, target_max=60)
+
+        if best_sample:
+            sample_filename = os.path.join(lang_dir, f"{speaker}_language_sample.mp3")
+            create_combined_audio_sample(best_sample, audio_file_path, sample_filename)
+
+            sample_duration = sum(seg['end'] - seg['start'] for seg in best_sample)
+            print(f"Generated {speaker} language sample: {sample_duration:.1f}s -> {sample_filename}")
+            generated_samples[speaker] = sample_filename
+        else:
+            print(f"Could not generate sufficient sample for {speaker}")
+
+    return generated_samples
+
+def detect_speaker_languages(language_samples, output_dir):
+    """Detect language for each speaker using Whisper and save to metadata.json."""
+    print("Detecting languages with Whisper...")
+
+    # Load Whisper model (using 'small' for good speed/accuracy balance)
+    model = whisper.load_model("small")
+
+    speaker_languages = {}
+
+    for speaker, sample_file in language_samples.items():
+        try:
+            # Load and process audio for language detection
+            audio = whisper.load_audio(sample_file)
+            audio = whisper.pad_or_trim(audio)
+
+            # Create mel spectrogram
+            mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
+
+            # Detect language
+            _, probs = model.detect_language(mel)
+            detected_language = max(probs, key=probs.get)
+            confidence = probs[detected_language]
+
+            speaker_languages[speaker] = {
+                "language": detected_language,
+                "confidence": float(confidence)
+            }
+
+            print(f"{speaker}: {detected_language} (confidence: {confidence:.3f})")
+
+        except Exception as e:
+            print(f"Error detecting language for {speaker}: {e}")
+            speaker_languages[speaker] = {
+                "language": "unknown",
+                "confidence": 0.0,
+                "error": str(e)
+            }
+
+    # Save metadata to JSON file
+    metadata_file = os.path.join(output_dir, "metadata.json")
+    with open(metadata_file, 'w') as f:
+        json.dump(speaker_languages, f, indent=2)
+
+    print(f"Language metadata saved to: {metadata_file}")
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: detect-language <audio_file>")
+        sys.exit(1)
+
+    file_path = sys.argv[1]
+    absolute_path = os.path.abspath(file_path)
+
+    # Generate paths from audio file basename
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    output_dir = os.path.join("output", base_name)
+    csv_filename = os.path.join(output_dir, f"{base_name}_timeline.csv")
+
+    # Check if timeline CSV exists
+    if not os.path.exists(csv_filename):
+        print(f"Error: Timeline CSV not found: {csv_filename}")
+        print("Run 'diarize' first to generate the timeline.")
+        sys.exit(1)
+
+    # Load segments from timeline CSV
+    segments = []
+    with open(csv_filename, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            segments.append({
+                'speaker': row['SPEAKER_ID'],
+                'start': float(row['start_time']),
+                'end': float(row['end_time'])
+            })
+
+    # Generate language detection samples
+    language_samples = generate_language_samples(segments, absolute_path, output_dir)
+
+    # Detect languages for each speaker
+    if language_samples:
+        detect_speaker_languages(language_samples, output_dir)
+
+if __name__ == "__main__":
+    main()

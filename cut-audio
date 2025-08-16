@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import csv
+import ffmpeg
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: cut-audio <audio_file>")
+        sys.exit(1)
+
+    file_path = sys.argv[1]
+    absolute_path = os.path.abspath(file_path)
+
+    # Generate paths from audio file basename
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    output_dir = os.path.join("output", base_name)
+    csv_filename = os.path.join(output_dir, f"{base_name}_timeline.csv")
+
+    # Check if timeline CSV exists
+    if not os.path.exists(csv_filename):
+        print(f"Error: Timeline CSV not found: {csv_filename}")
+        print("Run 'diarize' first to generate the timeline.")
+        sys.exit(1)
+
+    # Create audio subdirectory for segment files
+    audio_dir = os.path.join(output_dir, "audio")
+    os.makedirs(audio_dir, exist_ok=True)
+
+    # Read CSV and cut audio segments
+    print("Cutting audio segments...")
+    with open(csv_filename, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for i, row in enumerate(reader, 1):
+            start_time = float(row['start_time'])
+            end_time = float(row['end_time'])
+
+            # Generate 6-digit zero-padded filename
+            segment_filename = os.path.join(audio_dir, f"{i:06d}.mp3")
+
+            # Skip if audio segment already exists
+            if os.path.exists(segment_filename):
+                print(f"Skipping existing segment {i:06d}")
+                continue
+
+            # Cut audio segment using ffmpeg-python
+            stream = ffmpeg.input(absolute_path, ss=start_time, to=end_time)
+            ffmpeg.output(stream, segment_filename).run(overwrite_output=True, quiet=True)
+
+    print(f"Audio segments saved to: {audio_dir}")
+
+if __name__ == "__main__":
+    main()

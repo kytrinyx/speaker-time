@@ -13,17 +13,17 @@ A complete audio processing pipeline that performs speaker diarization, language
 
 ## Scripts
 
-### `speaker-time`
-Main processing script that handles the complete pipeline.
+### `process`
+Main processing script that orchestrates the complete pipeline.
 
 **Usage:**
 ```bash
-./speaker-time <audio_file>
+./process <audio_file>
 ```
 
 **Example:**
 ```bash
-./speaker-time sample.mp3
+./process sample.mp3
 ```
 
 **Output Structure:**
@@ -39,7 +39,42 @@ output/
     │   ├── SPEAKER_00_language_sample.mp3
     │   └── SPEAKER_01_language_sample.mp3
     ├── metadata.json               # Speaker language mapping
-    └── transcription.csv           # Complete transcription data
+    ├── transcription.csv           # Complete transcription data
+    └── sample.vtt                  # WebVTT subtitle file
+```
+
+### Individual Pipeline Scripts
+
+#### `diarize`
+Performs speaker diarization and generates timeline CSV.
+
+**Usage:**
+```bash
+./diarize <audio_file>
+```
+
+#### `cut-audio`
+Cuts audio into segments based on timeline CSV.
+
+**Usage:**
+```bash
+./cut-audio <audio_file>
+```
+
+#### `detect-language`
+Generates language samples and detects speaker languages.
+
+**Usage:**
+```bash
+./detect-language <audio_file>
+```
+
+#### `transcribe`
+Transcribes audio segments with language hints.
+
+**Usage:**
+```bash
+./transcribe <audio_file>
 ```
 
 ### `create-vtt`
@@ -57,6 +92,24 @@ Converts transcription CSV to WebVTT subtitle format.
 
 **Output:**
 - Creates `output/sample/sample.vtt` with properly formatted subtitles
+
+## Analysis Tools
+
+### `compute-speaking-time`
+Analyzes speaking time statistics from timeline CSV. Useful for understanding speaker distribution and segment counts.
+
+**Usage:**
+```bash
+./compute-speaking-time <basename>
+```
+
+**Example:**
+```bash
+./compute-speaking-time sample
+```
+
+**Output:**
+- Displays speaking time breakdown by speaker with percentages and segment counts
 
 ## Dependencies
 
@@ -109,7 +162,7 @@ export HUGGINGFACE_SPEAKER_DIARIZATION=your_token_here
 ### 4. Verify Setup
 Test your setup by running:
 ```bash
-./speaker-time sample.mp3
+./process sample.mp3
 ```
 
 ## File Formats
@@ -163,10 +216,14 @@ SPEAKER_00,2,0.7555178268251275,2.1307300509337863,그쵸 근데,ko,-0.629889215
 ## Example Usage
 
 ```bash
-# Process audio file
-./speaker-time interview.mp3
+# Process complete pipeline
+./process interview.mp3
 
-# Generate subtitles
+# Or run individual steps
+./diarize interview.mp3
+./cut-audio interview.mp3
+./detect-language interview.mp3
+./transcribe interview.mp3
 ./create-vtt interview
 
 # View results
@@ -181,4 +238,5 @@ ls output/interview/
 - Language detection improves transcription accuracy for multilingual content
 - VTT files exclude empty segments and timeout markers for clean subtitle output
 - Speaker diarization cannot guarantee same speaker id on multiple runs; if script crashes during diarization it will have to restart from scratch
-- If the script crashes while cutting the audio into segments or transcribing it can be rerun and it will pick up where it left off.
+- Individual scripts can be rerun independently; `cut-audio` and `transcribe` will resume where they left off
+- Use individual scripts for debugging or partial processing of the pipeline

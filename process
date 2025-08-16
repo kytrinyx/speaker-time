@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import subprocess
+
+def run_script(script_name, audio_file):
+    """Run a script with the audio file as argument."""
+    script_path = os.path.join(os.path.dirname(__file__), script_name)
+    
+    if not os.path.exists(script_path):
+        print(f"Error: Script {script_name} not found at {script_path}")
+        sys.exit(1)
+    
+    print(f"\n=== Running {script_name} ===")
+    result = subprocess.run([script_path, audio_file], check=True)
+    return result.returncode == 0
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: process <audio_file>")
+        sys.exit(1)
+
+    audio_file = sys.argv[1]
+    
+    if not os.path.exists(audio_file):
+        print(f"Error: Audio file not found: {audio_file}")
+        sys.exit(1)
+
+    # Get basename for final VTT creation
+    base_name = os.path.splitext(os.path.basename(audio_file))[0]
+
+    try:
+        # Run the pipeline steps in order
+        run_script("diarize", audio_file)
+        run_script("cut-audio", audio_file)
+        run_script("detect-language", audio_file)
+        run_script("transcribe", audio_file)
+        
+        # Run create-vtt with basename
+        print(f"\n=== Running create-vtt ===")
+        create_vtt_path = os.path.join(os.path.dirname(__file__), "create-vtt")
+        subprocess.run([create_vtt_path, base_name], check=True)
+        
+        print(f"\n=== Pipeline completed successfully for {audio_file} ===")
+        
+    except subprocess.CalledProcessError as e:
+        print(f"Error: Pipeline failed at step with exit code {e.returncode}")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nPipeline interrupted by user")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
