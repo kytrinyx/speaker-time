@@ -180,4 +180,5 @@ ls output/interview/
 - Audio segments are zero-padded (000001.mp3, 000002.mp3, etc.)
 - Language detection improves transcription accuracy for multilingual content
 - VTT files exclude empty segments and timeout markers for clean subtitle output
-- There's basically no error handling whatsoever, so if it crashes we have to start over. TODO: write output as it's generated, and have the script figure out where it left off so we don't have to do everything all over again.
+- Speaker diarization cannot guarantee same speaker id on multiple runs; if script crashes during diarization it will have to restart from scratch
+- If the script crashes while cutting the audio into segments or transcribing it can be rerun and it will pick up where it left off.
