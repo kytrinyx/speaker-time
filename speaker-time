@@ -90,5 +90,126 @@ def main():
     print(f"Audio segments saved to: {audio_dir}")
     print(f"Generated {len(resolved_segments)} audio files")
 
+    # Generate language detection samples
+    generate_language_samples(resolved_segments, absolute_path, output_dir)
+
+def find_contiguous_segments(segments, gap_threshold=3.0):
+    """Group segments by speaker and find contiguous periods within gap threshold."""
+    speaker_groups = {}
+    
+    # Group segments by speaker
+    for segment in segments:
+        speaker = segment['speaker']
+        if speaker not in speaker_groups:
+            speaker_groups[speaker] = []
+        speaker_groups[speaker].append(segment)
+    
+    # Find contiguous periods for each speaker
+    contiguous_periods = {}
+    for speaker, speaker_segments in speaker_groups.items():
+        periods = []
+        current_period = [speaker_segments[0]]
+        
+        for i in range(1, len(speaker_segments)):
+            gap = speaker_segments[i]['start'] - current_period[-1]['end']
+            
+            if gap <= gap_threshold:
+                # Continue current period
+                current_period.append(speaker_segments[i])
+            else:
+                # Start new period
+                periods.append(current_period)
+                current_period = [speaker_segments[i]]
+        
+        # Add the last period
+        periods.append(current_period)
+        contiguous_periods[speaker] = periods
+    
+    return contiguous_periods
+
+def generate_language_samples(segments, audio_file_path, output_dir):
+    """Generate 30-60 second audio samples for language detection."""
+    print("Generating language detection samples...")
+    
+    # Find contiguous segments
+    contiguous_periods = find_contiguous_segments(segments)
+    
+    # Create language detection subdirectory
+    lang_dir = os.path.join(output_dir, "language_detection")
+    os.makedirs(lang_dir, exist_ok=True)
+    
+    for speaker, periods in contiguous_periods.items():
+        # Calculate total speaking time for this speaker
+        total_duration = sum(seg['end'] - seg['start'] for seg in segments if seg['speaker'] == speaker)
+        
+        # Skip speakers with less than 20 seconds total
+        if total_duration < 20:
+            print(f"Skipping {speaker}: only {total_duration:.1f}s total speaking time")
+            continue
+        
+        # Find best combination of periods to get 20-60 seconds
+        best_sample = find_best_sample_combination(periods, target_min=20, target_max=60)
+        
+        if best_sample:
+            sample_filename = os.path.join(lang_dir, f"{speaker}_language_sample.mp3")
+            create_combined_audio_sample(best_sample, audio_file_path, sample_filename)
+            
+            sample_duration = sum(seg['end'] - seg['start'] for seg in best_sample)
+            print(f"Generated {speaker} language sample: {sample_duration:.1f}s -> {sample_filename}")
+        else:
+            print(f"Could not generate sufficient sample for {speaker}")
+
+def find_best_sample_combination(periods, target_min=30, target_max=60):
+    """Find the best combination of contiguous periods to reach target duration."""
+    # Sort periods by total duration (largest first)
+    period_durations = []
+    for period in periods:
+        duration = sum(seg['end'] - seg['start'] for seg in period)
+        period_durations.append((period, duration))
+    
+    period_durations.sort(key=lambda x: x[1], reverse=True)
+    
+    # Try to find combination that fits target
+    best_combination = []
+    current_duration = 0
+    
+    for period, duration in period_durations:
+        if current_duration + duration <= target_max:
+            best_combination.extend(period)
+            current_duration += duration
+            
+            if current_duration >= target_min:
+                break
+    
+    # Return segments sorted by time
+    if current_duration >= target_min:
+        best_combination.sort(key=lambda x: x['start'])
+        return best_combination
+    
+    return None
+
+def create_combined_audio_sample(segments, audio_file_path, output_filename):
+    """Create a single audio file from multiple segments."""
+    if not segments:
+        return
+    
+    # If only one segment, extract directly
+    if len(segments) == 1:
+        seg = segments[0]
+        stream = ffmpeg.input(audio_file_path, ss=seg['start'], to=seg['end'])
+        ffmpeg.output(stream, output_filename).run(overwrite_output=True, quiet=True)
+        return
+    
+    # For multiple segments, concatenate them
+    inputs = []
+    for seg in segments:
+        duration = seg['end'] - seg['start']
+        segment_stream = ffmpeg.input(audio_file_path, ss=seg['start'], t=duration)
+        inputs.append(segment_stream)
+    
+    # Concatenate all segments
+    joined = ffmpeg.concat(*inputs, v=0, a=1)
+    ffmpeg.output(joined, output_filename).run(overwrite_output=True, quiet=True)
+
 if __name__ == "__main__":
     main()
