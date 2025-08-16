@@ -148,7 +148,7 @@ SPEAKER_00,2,0.7555178268251275,2.1307300509337863,그쵸 근데,ko,-0.629889215
 - **Language Sample Duration**: 20-60 seconds per speaker
 - **Segment Gap Threshold**: 3 seconds (segments within 3s are considered contiguous)
 - **Transcription Timeout**: 30 seconds per audio segment
-- **Whisper Model**: Uses "small" model for balance of speed and accuracy
+- **Whisper Model**: Uses "small" model for balance of speed and accuracy (actually, tell a lie; it's because my computer can't handle bigger ones)
 
 ## Workflow
 
@@ -180,3 +180,4 @@ ls output/interview/
 - Audio segments are zero-padded (000001.mp3, 000002.mp3, etc.)
 - Language detection improves transcription accuracy for multilingual content
 - VTT files exclude empty segments and timeout markers for clean subtitle output
+- There's basically no error handling whatsoever, so if it crashes we have to start over. TODO: write output as it's generated, and have the script figure out where it left off so we don't have to do everything all over again.
