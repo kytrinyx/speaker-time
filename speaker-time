@@ -98,6 +98,9 @@ def main():
     # Detect languages for each speaker
     if language_samples:
         detect_speaker_languages(language_samples, output_dir)
+        
+        # Transcribe all audio segments
+        transcribe_segments(output_dir)
 
 def find_contiguous_segments(segments, gap_threshold=3.0):
     """Group segments by speaker and find contiguous periods within gap threshold."""
@@ -266,6 +269,116 @@ def detect_speaker_languages(language_samples, output_dir):
         json.dump(speaker_languages, f, indent=2)
     
     print(f"Language metadata saved to: {metadata_file}")
+
+def transcribe_segments(output_dir):
+    """Transcribe all audio segments using Whisper and save to transcription.csv."""
+    print("Transcribing audio segments...")
+    
+    # Load Whisper model
+    model = whisper.load_model("small")
+    
+    # Load metadata for language hints
+    metadata_file = os.path.join(output_dir, "metadata.json")
+    speaker_languages = {}
+    if os.path.exists(metadata_file):
+        with open(metadata_file, 'r') as f:
+            metadata = json.load(f)
+            for speaker, data in metadata.items():
+                speaker_languages[speaker] = data.get("language", "en")
+    
+    # Load timeline CSV to map segments to speakers and timestamps
+    timeline_file = None
+    for file in os.listdir(output_dir):
+        if file.endswith("_timeline.csv"):
+            timeline_file = os.path.join(output_dir, file)
+            break
+    
+    if not timeline_file:
+        print("Error: Timeline CSV file not found")
+        return
+    
+    timeline_data = []
+    with open(timeline_file, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            timeline_data.append(row)
+    
+    # Transcribe each audio segment
+    audio_dir = os.path.join(output_dir, "audio")
+    transcription_data = []
+    
+    for i, timeline_row in enumerate(timeline_data, 1):
+        segment_file = os.path.join(audio_dir, f"{i:06d}.mp3")
+        
+        if not os.path.exists(segment_file):
+            print(f"Warning: Audio segment {segment_file} not found")
+            continue
+        
+        speaker_id = timeline_row['SPEAKER_ID']
+        language = speaker_languages.get(speaker_id, "en")
+        
+        try:
+            # Transcribe with language hint and timeout per segment
+            import signal
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Transcription timeout")
+            
+            # Set timeout for individual segment (30 seconds per segment)
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(30)
+            
+            try:
+                result = model.transcribe(segment_file, language=language)
+                signal.alarm(0)  # Cancel timeout
+                
+                transcription_data.append({
+                    'speaker_id': speaker_id,
+                    'segment_id': i,
+                    'start_time': timeline_row['start_time'],
+                    'end_time': timeline_row['end_time'],
+                    'text': result['text'].strip(),
+                    'language': language,
+                    'confidence': float(result.get('segments', [{}])[0].get('avg_logprob', 0.0)) if result.get('segments') else 0.0
+                })
+                
+                print(f"Transcribed segment {i:06d} ({speaker_id}): {result['text'].strip()[:50]}...")
+                
+            except TimeoutError:
+                signal.alarm(0)  # Cancel timeout
+                print(f"Timeout transcribing segment {i:06d} (30s limit exceeded)")
+                transcription_data.append({
+                    'speaker_id': speaker_id,
+                    'segment_id': i,
+                    'start_time': timeline_row['start_time'],
+                    'end_time': timeline_row['end_time'],
+                    'text': "[TIMEOUT]",
+                    'language': language,
+                    'confidence': 0.0
+                })
+            
+        except Exception as e:
+            print(f"Error transcribing segment {i:06d}: {e}")
+            transcription_data.append({
+                'speaker_id': speaker_id,
+                'segment_id': i,
+                'start_time': timeline_row['start_time'],
+                'end_time': timeline_row['end_time'],
+                'text': "",
+                'language': language,
+                'confidence': 0.0
+            })
+    
+    # Save transcription CSV
+    transcription_file = os.path.join(output_dir, "transcription.csv")
+    with open(transcription_file, 'w', newline='') as csvfile:
+        fieldnames = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(transcription_data)
+    
+    print(f"Transcription saved to: {transcription_file}")
+    print(f"Transcribed {len(transcription_data)} segments")
 
 if __name__ == "__main__":
     main()
