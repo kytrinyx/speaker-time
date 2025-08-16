@@ -3,6 +3,7 @@
 import sys
 import os
 import csv
+import ffmpeg
 from pyannote.audio import Pipeline
 
 def main():
@@ -66,6 +67,28 @@ def main():
 
     print(f"Timeline saved to: {csv_filename}")
     print(f"Total segments: {len(resolved_segments)}")
+
+    # Create audio subdirectory for segment files
+    audio_dir = os.path.join(output_dir, "audio")
+    os.makedirs(audio_dir, exist_ok=True)
+
+    # Read CSV and cut audio segments
+    print("Cutting audio segments...")
+    with open(csv_filename, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for i, row in enumerate(reader, 1):
+            start_time = float(row['start_time'])
+            end_time = float(row['end_time'])
+            
+            # Generate 6-digit zero-padded filename
+            segment_filename = os.path.join(audio_dir, f"{i:06d}.mp3")
+            
+            # Cut audio segment using ffmpeg-python
+            stream = ffmpeg.input(absolute_path, ss=start_time, to=end_time)
+            ffmpeg.output(stream, segment_filename).run(overwrite_output=True, quiet=True)
+    
+    print(f"Audio segments saved to: {audio_dir}")
+    print(f"Generated {len(resolved_segments)} audio files")
 
 if __name__ == "__main__":
     main()
