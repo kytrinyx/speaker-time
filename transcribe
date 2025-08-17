@@ -38,7 +38,7 @@ def main():
     # Load Whisper model with GPU detection
     device = "cuda" if torch.cuda.is_available() else "cpu"
     use_fp16 = device == "cuda"
-    model = whisper.load_model("small", device=device, fp16=use_fp16)
+    model = whisper.load_model("small", device=device)
 
     # Load metadata for language hints
     speaker_languages = {}
@@ -102,7 +102,7 @@ def main():
             signal.alarm(30)
 
             try:
-                result = model.transcribe(segment_file, language=language)
+                result = model.transcribe(segment_file, language=language, fp16=use_fp16)
                 signal.alarm(0)  # Cancel timeout
 
                 transcription_row = {
