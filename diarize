@@ -54,7 +54,7 @@ def main():
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     output_dir = os.path.join("output", base_name)
     os.makedirs(output_dir, exist_ok=True)
-    csv_filename = os.path.join(output_dir, f"{base_name}_timeline.csv")
+    csv_filename = os.path.join(output_dir, "timeline.csv")
 
     # Write timeline to CSV
     with open(csv_filename, 'w', newline='') as csvfile:

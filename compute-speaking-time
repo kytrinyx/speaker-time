@@ -22,7 +22,7 @@ def main():
     basename = os.path.splitext(os.path.basename(audiofile))[0]
 
     # Construct file paths
-    timeline_file = os.path.join("output", basename, f"{basename}_timeline.csv")
+    timeline_file = os.path.join("output", basename, "timeline.csv")
     metadata_file = os.path.join("output", basename, "metadata.json")
 
     # Check if timeline file exists
