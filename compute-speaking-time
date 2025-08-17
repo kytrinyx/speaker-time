@@ -14,11 +14,12 @@ def format_duration(seconds):
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: compute-speaking-time <basename>")
-        print("Example: compute-speaking-time sample")
+        print("Usage: compute-speaking-time <audiofile>")
+        print("Example: compute-speaking-time sample.mp3")
         sys.exit(1)
 
-    basename = sys.argv[1]
+    audiofile = sys.argv[1]
+    basename = os.path.splitext(os.path.basename(audiofile))[0]
 
     # Construct file paths
     timeline_file = os.path.join("output", basename, f"{basename}_timeline.csv")

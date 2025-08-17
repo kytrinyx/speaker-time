@@ -88,12 +88,12 @@ Converts transcription CSV to WebVTT subtitle format.
 
 **Usage:**
 ```bash
-./create-vtt <basename>
+./create-vtt <audiofile>
 ```
 
 **Example:**
 ```bash
-./create-vtt sample
+./create-vtt sample.mp3
 ```
 
 **Output:**
@@ -106,12 +106,12 @@ Analyzes speaking time statistics from timeline CSV. Useful for understanding sp
 
 **Usage:**
 ```bash
-./compute-speaking-time <basename>
+./compute-speaking-time <audiofile>
 ```
 
 **Example:**
 ```bash
-./compute-speaking-time sample
+./compute-speaking-time sample.mp3
 ```
 
 **Output:**
@@ -230,7 +230,7 @@ SPEAKER_00,2,0.7555178268251275,2.1307300509337863,그쵸 근데,ko,-0.629889215
 ./cut-audio interview.mp3
 ./detect-language interview.mp3
 ./transcribe interview.mp3
-./create-vtt interview
+./create-vtt interview.mp3
 
 # View results
 ls output/interview/

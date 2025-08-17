@@ -37,10 +37,10 @@ def main():
         run_script("detect-language", audio_file)
         run_script("transcribe", audio_file)
         
-        # Run create-vtt with basename
+        # Run create-vtt with audio file
         print(f"\n=== Running create-vtt ===")
         create_vtt_path = os.path.join(os.path.dirname(__file__), "create-vtt")
-        subprocess.run([create_vtt_path, base_name], check=True)
+        subprocess.run([create_vtt_path, audio_file], check=True)
         
         print(f"\n=== Pipeline completed successfully for {audio_file} ===")
         

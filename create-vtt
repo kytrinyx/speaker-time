@@ -13,11 +13,12 @@ def format_timestamp(seconds):
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: create-vtt <basename>")
-        print("Example: create-vtt sample")
+        print("Usage: create-vtt <audiofile>")
+        print("Example: create-vtt sample.mp3")
         sys.exit(1)
 
-    basename = sys.argv[1]
+    audiofile = sys.argv[1]
+    basename = os.path.splitext(os.path.basename(audiofile))[0]
 
     # Construct paths
     transcription_file = os.path.join("output", basename, "transcription.csv")
