@@ -13,6 +13,12 @@ A complete audio processing pipeline that performs speaker diarization, language
 
 ## Scripts
 
+To download a video from YouTube, try `yt-dlp`:
+
+```
+yt-dlp --extract-audio --audio-format=mp3 -o "$DESTINATION_NAME.%(ext)s" "$YOUTUBE_URL"
+```
+
 ### `process`
 Main processing script that orchestrates the complete pipeline.
 
