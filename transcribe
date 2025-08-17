@@ -5,6 +5,7 @@ import os
 import csv
 import json
 import whisper
+import torch
 import signal
 
 def main():
@@ -34,8 +35,10 @@ def main():
 
     print("Transcribing audio segments...")
 
-    # Load Whisper model
-    model = whisper.load_model("small")
+    # Load Whisper model with GPU detection
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    use_fp16 = device == "cuda"
+    model = whisper.load_model("small", device=device, fp16=use_fp16)
 
     # Load metadata for language hints
     speaker_languages = {}
