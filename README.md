@@ -83,7 +83,7 @@ Transcribes audio segments with language hints.
 ./transcribe <audio_file>
 ```
 
-### `create-vtt`
+#### `create-vtt`
 Converts transcription CSV to WebVTT subtitle format.
 
 **Usage:**
