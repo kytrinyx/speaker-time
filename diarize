@@ -13,6 +13,22 @@ def main():
     file_path = sys.argv[1]
     absolute_path = os.path.abspath(file_path)
 
+    # Generate output directory and CSV filename
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    output_dir = os.path.join("output", base_name)
+    os.makedirs(output_dir, exist_ok=True)
+    csv_filename = os.path.join(output_dir, "timeline.csv")
+
+    # Check if diarization already completed
+    if os.path.exists(csv_filename):
+        # Check if file has data beyond just the header
+        with open(csv_filename, 'r') as csvfile:
+            lines = csvfile.readlines()
+            if len(lines) > 1:  # More than just header row
+                print(f"Timeline already exists: {csv_filename}")
+                print(f"Skipping diarization (found {len(lines) - 1} segments)")
+                sys.exit(0)
+
     # Initialize pyannote pipeline
     hf_token = os.getenv("HUGGINGFACE_SPEAKER_DIARIZATION")
     if not hf_token:
@@ -49,12 +65,6 @@ def main():
 
         if not overlapping:
             resolved_segments.append(segment)
-
-    # Generate output directory and CSV filename
-    base_name = os.path.splitext(os.path.basename(file_path))[0]
-    output_dir = os.path.join("output", base_name)
-    os.makedirs(output_dir, exist_ok=True)
-    csv_filename = os.path.join(output_dir, "timeline.csv")
 
     # Write timeline to CSV
     with open(csv_filename, 'w', newline='') as csvfile:

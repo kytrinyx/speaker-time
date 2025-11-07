@@ -243,6 +243,6 @@ ls output/interview/
 - Audio segments are zero-padded (000001.mp3, 000002.mp3, etc.)
 - Language detection improves transcription accuracy for multilingual content
 - VTT files exclude empty segments and timeout markers for clean subtitle output
+- All pipeline scripts efficiently handle re-runs by skipping completed steps: `diarize` skips if timeline.csv exists, `cut-audio` and `transcribe` resume where they left off
 - Speaker diarization cannot guarantee same speaker id on multiple runs; if script crashes during diarization it will have to restart from scratch
-- Individual scripts can be rerun independently; `cut-audio` and `transcribe` will resume where they left off
 - Use individual scripts for debugging or partial processing of the pipeline
