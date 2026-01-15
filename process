@@ -3,6 +3,7 @@
 import sys
 import os
 import subprocess
+import shutil
 
 def run_script(script_name, audio_file):
     """Run a script with the audio file as argument."""
@@ -37,6 +38,16 @@ def main():
         run_script("detect-language", audio_file)
         run_script("transcribe", audio_file)
         run_script("create-vtt", audio_file)
+
+        # Copy VTT file to Desktop
+        vtt_file = os.path.join("output", base_name, f"{base_name}.vtt")
+        desktop_path = os.path.expanduser("~/Desktop/")
+        if os.path.exists(vtt_file):
+            shutil.copy(vtt_file, desktop_path)
+            print(f"VTT file copied to {desktop_path}")
+        else:
+            print(f"Warning: VTT file not found at {vtt_file}")
+
         print(f"\n=== Pipeline completed successfully for {audio_file} ===")
 
     except subprocess.CalledProcessError as e:
