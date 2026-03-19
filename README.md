@@ -36,7 +36,7 @@ Main processing script that orchestrates the complete pipeline.
 ```
 output/
 └── sample/
-    ├── sample_timeline.csv          # Speaker timeline with timestamps
+    ├── timeline.csv                 # Speaker timeline with timestamps
     ├── audio/                       # Individual audio segments
     │   ├── 000001.mp3
     │   ├── 000002.mp3
@@ -46,6 +46,7 @@ output/
     │   └── SPEAKER_01_language_sample.mp3
     ├── metadata.json               # Speaker language mapping
     ├── transcription.csv           # Complete transcription data
+    ├── words.csv                   # Word-level timestamps from transcription
     └── sample.vtt                  # WebVTT subtitle file
 ```
 
@@ -76,12 +77,16 @@ Generates language samples and detects speaker languages.
 ```
 
 #### `transcribe`
-Transcribes audio segments with language hints.
+Transcribes audio segments with language hints. Captures word-level timestamps alongside segment-level transcription.
 
 **Usage:**
 ```bash
 ./transcribe <audio_file>
 ```
+
+**Output:**
+- `transcription.csv` — one row per speaker segment with full text
+- `words.csv` — one row per word with absolute timestamps and probability
 
 #### `create-vtt`
 Converts transcription CSV to WebVTT subtitle format.
@@ -173,7 +178,7 @@ Test your setup by running:
 
 ## File Formats
 
-### Timeline CSV (`*_timeline.csv`)
+### Timeline CSV (`timeline.csv`)
 ```csv
 SPEAKER_ID,start_time,end_time
 SPEAKER_00,0.008488964346349746,0.534804753820034
@@ -200,6 +205,17 @@ speaker_id,segment_id,start_time,end_time,text,language,confidence
 SPEAKER_00,1,0.008488964346349746,0.534804753820034,,ko,0.0
 SPEAKER_00,2,0.7555178268251275,2.1307300509337863,그쵸 근데,ko,-0.6298892157418388
 ```
+
+### Words CSV (`words.csv`)
+Word-level timestamps with absolute times (offset to match the original audio, not the segment file).
+
+```csv
+segment_id,word_index,word,start_time,end_time,probability
+2,0, 그쵸,0.756,1.276,0.8263
+2,1, 근데,1.276,1.516,0.5683
+```
+
+Segments with timeouts or errors produce no rows in this file.
 
 ## Configuration
 
@@ -234,7 +250,7 @@ SPEAKER_00,2,0.7555178268251275,2.1307300509337863,그쵸 근데,ko,-0.629889215
 
 # View results
 ls output/interview/
-# interview_timeline.csv  audio/  language_detection/  metadata.json  transcription.csv  interview.vtt
+# timeline.csv  audio/  language_detection/  metadata.json  transcription.csv  words.csv  interview.vtt
 ```
 
 ## Notes

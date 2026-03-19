@@ -57,6 +57,7 @@ def main():
 
     # Check for existing transcription to resume from
     transcription_file = os.path.join(output_dir, "transcription.csv")
+    words_file = os.path.join(output_dir, "words.csv")
     last_completed_segment = 0
 
     if os.path.exists(transcription_file):
@@ -68,9 +69,13 @@ def main():
                     last_completed_segment = segment_id
         print(f"Resuming transcription from segment {last_completed_segment + 1}")
     else:
-        # Create new file with header
+        # Create new files with headers
         with open(transcription_file, 'w', newline='') as csvfile:
             fieldnames = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+        with open(words_file, 'w', newline='') as csvfile:
+            fieldnames = ['segment_id', 'word_index', 'word', 'start_time', 'end_time', 'probability']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
 
@@ -92,6 +97,7 @@ def main():
         language = speaker_languages.get(speaker_id, "en")
 
         transcription_row = None
+        word_rows = []
 
         try:
             def timeout_handler(signum, frame):
@@ -102,7 +108,7 @@ def main():
             signal.alarm(30)
 
             try:
-                result = model.transcribe(segment_file, language=language, fp16=use_fp16)
+                result = model.transcribe(segment_file, language=language, fp16=use_fp16, word_timestamps=True)
                 signal.alarm(0)  # Cancel timeout
 
                 transcription_row = {
@@ -114,6 +120,20 @@ def main():
                     'language': language,
                     'confidence': float(result.get('segments', [{}])[0].get('avg_logprob', 0.0)) if result.get('segments') else 0.0
                 }
+
+                segment_offset = float(timeline_row['start_time'])
+                word_index = 0
+                for whisper_segment in result.get('segments', []):
+                    for word_info in whisper_segment.get('words', []):
+                        word_rows.append({
+                            'segment_id': i,
+                            'word_index': word_index,
+                            'word': word_info['word'],
+                            'start_time': round(segment_offset + word_info['start'], 3),
+                            'end_time': round(segment_offset + word_info['end'], 3),
+                            'probability': round(word_info.get('probability', 0.0), 4),
+                        })
+                        word_index += 1
 
                 print(f"Transcribed segment {i:06d} ({speaker_id}): {result['text'].strip()[:50]}...")
 
@@ -148,6 +168,11 @@ def main():
                 fieldnames = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writerow(transcription_row)
+            if word_rows:
+                with open(words_file, 'a', newline='') as csvfile:
+                    fieldnames = ['segment_id', 'word_index', 'word', 'start_time', 'end_time', 'probability']
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer.writerows(word_rows)
             transcribed_count += 1
 
     print(f"Transcription saved to: {transcription_file}")
