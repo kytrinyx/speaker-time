@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+
+import csv
+import glob
+import os
+import re
+from collections import defaultdict
+
+KO_THRESHOLD = 45
+EN_THRESHOLD = 100
+
+def is_filler(text, lang):
+    if lang == "ko":
+        return bool(re.fullmatch(r'[ㅋㅎ아어고으\s]+', text))
+    return bool(re.fullmatch(r'[hH][aAeE]+([hH][aAeE]*)*[\s!.]*', text))
+
+long_segments = []
+
+for path in glob.glob("output/*/transcription.csv"):
+    episode = path.split("/")[1]
+    with open(path) as f:
+        for row in csv.DictReader(f):
+            text = row["text"].strip()
+            lang = row["language"]
+            if is_filler(text, lang):
+                continue
+            char_count = len(text)
+            threshold = KO_THRESHOLD if lang == "ko" else EN_THRESHOLD
+            if char_count > threshold:
+                long_segments.append({
+                    "episode": episode,
+                    "segment_id": row["segment_id"],
+                    "language": lang,
+                    "char_count": char_count,
+                    "text": text,
+                })
+
+long_segments.sort(key=lambda r: (r["language"], -r["char_count"]))
+
+os.makedirs("output", exist_ok=True)
+with open("output/long-segments.csv", "w", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=["episode", "segment_id", "language", "char_count", "text"])
+    writer.writeheader()
+    writer.writerows(long_segments)
+
+print(f"Wrote {len(long_segments)} long segments to output/long-segments.csv\n")
+
+by_lang = defaultdict(list)
+for r in long_segments:
+    by_lang[r["language"]].append(r)
+
+for lang in sorted(by_lang):
+    rows = by_lang[lang]
+    print(f"{lang}: {len(rows)} segments above threshold")
+    print(f"  Top 10 longest:")
+    for r in sorted(rows, key=lambda r: -r["char_count"])[:10]:
+        print(f"  [{r['char_count']:4d}] {r['episode']} seg {r['segment_id']}: {r['text'][:80]}")
+    print()
