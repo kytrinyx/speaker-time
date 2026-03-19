@@ -4,6 +4,7 @@ A complete audio processing pipeline that performs speaker diarization, language
 
 ## Features
 
+- **Youtube Download**: Downloads a given youtube video
 - **Speaker Diarization**: Identifies different speakers and their speaking segments
 - **Overlap Resolution**: Handles overlapping speech by prioritizing the original speaker
 - **Language Detection**: Automatically detects the language spoken by each speaker
@@ -13,23 +14,35 @@ A complete audio processing pipeline that performs speaker diarization, language
 
 ## Scripts
 
-To download a video from YouTube, try `yt-dlp`:
-
-```
-yt-dlp --extract-audio --audio-format=mp3 -o "$DESTINATION_NAME.%(ext)s" "$YOUTUBE_URL"
-```
-
 ### `process`
-Main processing script that orchestrates the complete pipeline.
+Main entry point. Downloads a YouTube video and runs the complete pipeline.
 
 **Usage:**
 ```bash
-./process <audio_file>
+./process <url> <--cohost>
 ```
 
 **Example:**
 ```bash
-./process sample.mp3
+./process https://www.youtube.com/watch?v=... --jeep
+```
+
+### `download`
+Downloads a YouTube video as MP3 and determines the next episode filename based on existing output directories. Outputs the filename to stdout.
+
+**Usage:**
+```bash
+./download <url> <--cohost>
+```
+
+**Example:**
+```bash
+./download https://www.youtube.com/watch?v=... --jeep
+```
+
+This counts existing `output/jeep*` directories to determine the episode number, downloads the audio as e.g. `jeep-ep-004.mp3`, and prints the filename:
+```
+jeep-ep-004.mp3
 ```
 
 **Output Structure:**
@@ -89,7 +102,7 @@ Transcribes audio segments with language hints. Captures word-level timestamps a
 - `words.csv` — one row per word with absolute timestamps and probability
 
 #### `create-vtt`
-Converts transcription CSV to WebVTT subtitle format.
+Converts transcription CSV to WebVTT subtitle format. When `words.csv` is present, applies `HybridSplit` to produce shorter, more readable cues with accurate per-cue timestamps: first splits at sentence-ending punctuation, then uses a local Ollama model to sub-split any cue still over 80 characters.
 
 **Usage:**
 ```bash
@@ -102,7 +115,10 @@ Converts transcription CSV to WebVTT subtitle format.
 ```
 
 **Output:**
-- Creates `output/sample/sample.vtt` with properly formatted subtitles
+- Creates `output/sample/sample.vtt`
+- One cue per sentence boundary (or per segment if `words.csv` is absent)
+
+**Requires:** Ollama running locally (for sub-splitting long cues); uses `exaone3.5:latest` by default.
 
 ## Analysis Tools
 
@@ -122,6 +138,26 @@ Analyzes speaking time statistics from timeline CSV. Useful for understanding sp
 **Output:**
 - Displays speaking time breakdown by speaker with percentages and segment counts
 
+### `scan-long-segments`
+Scans all `output/*/transcription.csv` files and reports segments exceeding per-language character thresholds (45 for Korean, 100 for English). Useful for identifying candidates that benefit most from cue splitting.
+
+**Usage:**
+```bash
+./scan-long-segments
+```
+
+**Output:**
+- Writes `output/long-segments.csv` with all long segments
+- Prints a summary to stdout with the top 10 longest per language
+
+### `test-cue-splitting`
+Development tool for testing the `HybridSplit` strategy against a fixture dataset (`output/test-cues/`). Runs `PunctuationSplit` over the fixture segments and prints resulting cues with timestamps.
+
+**Usage:**
+```bash
+./test-cue-splitting
+```
+
 ## Dependencies
 
 ### System Dependencies
@@ -132,6 +168,9 @@ Analyzes speaking time statistics from timeline CSV. Useful for understanding sp
 - pyannote.audio
 - openai-whisper
 - ffmpeg-python
+
+### Local Services
+- **Ollama**: Required by `create-vtt` for sub-splitting long cues. Install from [ollama.com](https://ollama.com) and pull the model: `ollama pull exaone3.5:latest`
 
 ## Setup Instructions
 
@@ -171,9 +210,11 @@ export HUGGINGFACE_SPEAKER_DIARIZATION=your_token_here
 ```
 
 ### 4. Verify Setup
+A `sample.mp3` is included in the repo. Its source is https://youtu.be/0rlG4kVKZ3E.
+
 Test your setup by running:
 ```bash
-./process sample.mp3
+./diarize sample.mp3
 ```
 
 ## File Formats
@@ -238,10 +279,13 @@ Segments with timeouts or errors produce no rows in this file.
 ## Example Usage
 
 ```bash
-# Process complete pipeline
-./process interview.mp3
+# Full pipeline: download + process
+./process https://www.youtube.com/watch?v=... --jeep
 
-# Or run individual steps
+# Download only (outputs filename)
+./download https://www.youtube.com/watch?v=... --jeep
+
+# Run individual steps on a local file
 ./diarize interview.mp3
 ./cut-audio interview.mp3
 ./detect-language interview.mp3
@@ -259,6 +303,7 @@ ls output/interview/
 - Audio segments are zero-padded (000001.mp3, 000002.mp3, etc.)
 - Language detection improves transcription accuracy for multilingual content
 - VTT files exclude empty segments and timeout markers for clean subtitle output
+- `create-vtt` produces multiple cues per segment when `words.csv` is present; falls back to one cue per segment otherwise
 - All pipeline scripts efficiently handle re-runs by skipping completed steps: `diarize` skips if timeline.csv exists, `cut-audio` and `transcribe` resume where they left off
 - Speaker diarization cannot guarantee same speaker id on multiple runs; if script crashes during diarization it will have to restart from scratch
 - Use individual scripts for debugging or partial processing of the pipeline
