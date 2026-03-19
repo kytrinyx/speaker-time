@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import glob
+import subprocess
+
+def main():
+    if len(sys.argv) != 3:
+        print("Usage: download <url> <--cohost>", file=sys.stderr)
+        sys.exit(1)
+
+    url = next((arg for arg in sys.argv[1:] if arg.startswith("http")), None)
+    cohost_arg = next((arg for arg in sys.argv[1:] if arg.startswith("--")), None)
+
+    if url is None:
+        print("Could not identify URL. Must start with 'http'.", file=sys.stderr)
+        sys.exit(1)
+
+    if cohost_arg is None:
+        print("Could not identify cohost. E.g. --jeep --katrina", file=sys.stderr)
+        sys.exit(1)
+
+    cohost = cohost_arg.lstrip("-")
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    pattern = os.path.join(script_dir, "output", f"{cohost}*")
+    number = len(glob.glob(pattern)) + 1
+    basename = f"{cohost}-ep-{number:03d}"
+
+    mp3_path = os.path.join(script_dir, f"{basename}.mp3")
+    if os.path.exists(mp3_path):
+        print(f"{basename}.mp3 already exists.", file=sys.stderr)
+        sys.exit(1)
+
+    subprocess.run(
+        ["yt-dlp", "--extract-audio", "--audio-format=mp3",
+         "-o", f"{basename}.%(ext)s", url],
+        check=True,
+        stdout=sys.stderr,
+    )
+    print(f"{basename}.mp3")
+
+if __name__ == "__main__":
+    main()

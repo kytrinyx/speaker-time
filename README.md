@@ -19,12 +19,12 @@ Main entry point. Downloads a YouTube video and runs the complete pipeline.
 
 **Usage:**
 ```bash
-./process <url> <--cohost>
+./bin/process <url> <--cohost>
 ```
 
 **Example:**
 ```bash
-./process https://www.youtube.com/watch?v=... --jeep
+./bin/process https://www.youtube.com/watch?v=... --jeep
 ```
 
 ### `download`
@@ -32,12 +32,12 @@ Downloads a YouTube video as MP3 and determines the next episode filename based 
 
 **Usage:**
 ```bash
-./download <url> <--cohost>
+./bin/download <url> <--cohost>
 ```
 
 **Example:**
 ```bash
-./download https://www.youtube.com/watch?v=... --jeep
+./bin/download https://www.youtube.com/watch?v=... --jeep
 ```
 
 This counts existing `output/jeep*` directories to determine the episode number, downloads the audio as e.g. `jeep-ep-004.mp3`, and prints the filename:
@@ -70,7 +70,7 @@ Performs speaker diarization and generates timeline CSV.
 
 **Usage:**
 ```bash
-./diarize <audio_file>
+./bin/diarize <audio_file>
 ```
 
 #### `cut-audio`
@@ -78,7 +78,7 @@ Cuts audio into segments based on timeline CSV.
 
 **Usage:**
 ```bash
-./cut-audio <audio_file>
+./bin/cut-audio <audio_file>
 ```
 
 #### `detect-language`
@@ -86,7 +86,7 @@ Generates language samples and detects speaker languages.
 
 **Usage:**
 ```bash
-./detect-language <audio_file>
+./bin/detect-language <audio_file>
 ```
 
 #### `transcribe`
@@ -94,7 +94,7 @@ Transcribes audio segments with language hints. Captures word-level timestamps a
 
 **Usage:**
 ```bash
-./transcribe <audio_file>
+./bin/transcribe <audio_file>
 ```
 
 **Output:**
@@ -106,12 +106,12 @@ Converts transcription CSV to WebVTT subtitle format. When `words.csv` is presen
 
 **Usage:**
 ```bash
-./create-vtt <audiofile>
+./bin/create-vtt <audiofile>
 ```
 
 **Example:**
 ```bash
-./create-vtt sample.mp3
+./bin/create-vtt sample.mp3
 ```
 
 **Output:**
@@ -127,12 +127,12 @@ Analyzes speaking time statistics from timeline CSV. Useful for understanding sp
 
 **Usage:**
 ```bash
-./compute-speaking-time <audiofile>
+./bin/compute-speaking-time <audiofile>
 ```
 
 **Example:**
 ```bash
-./compute-speaking-time sample.mp3
+./bin/compute-speaking-time sample.mp3
 ```
 
 **Output:**
@@ -143,7 +143,7 @@ Scans all `output/*/transcription.csv` files and reports segments exceeding per-
 
 **Usage:**
 ```bash
-./scan-long-segments
+./bin/scan-long-segments
 ```
 
 **Output:**
@@ -155,7 +155,7 @@ Development tool for testing the `HybridSplit` strategy against a fixture datase
 
 **Usage:**
 ```bash
-./test-cue-splitting
+./bin/test-cue-splitting
 ```
 
 ## Dependencies
@@ -214,7 +214,7 @@ A `sample.mp3` is included in the repo. Its source is https://youtu.be/0rlG4kVKZ
 
 Test your setup by running:
 ```bash
-./diarize sample.mp3
+./bin/diarize sample.mp3
 ```
 
 ## File Formats
@@ -280,17 +280,17 @@ Segments with timeouts or errors produce no rows in this file.
 
 ```bash
 # Full pipeline: download + process
-./process https://www.youtube.com/watch?v=... --jeep
+./bin/process https://www.youtube.com/watch?v=... --jeep
 
 # Download only (outputs filename)
-./download https://www.youtube.com/watch?v=... --jeep
+./bin/download https://www.youtube.com/watch?v=... --jeep
 
 # Run individual steps on a local file
-./diarize interview.mp3
-./cut-audio interview.mp3
-./detect-language interview.mp3
-./transcribe interview.mp3
-./create-vtt interview.mp3
+./bin/diarize interview.mp3
+./bin/cut-audio interview.mp3
+./bin/detect-language interview.mp3
+./bin/transcribe interview.mp3
+./bin/create-vtt interview.mp3
 
 # View results
 ls output/interview/
