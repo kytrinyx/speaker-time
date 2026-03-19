@@ -154,12 +154,13 @@ class OllamaSplit:
 class HybridSplit:
     """Punctuation split first; ollama sub-splits cues that are still too long; merge short fragments."""
 
-    def __init__(self, max_chars=80, min_chars=20, model="exaone3.5:latest"):
-        self.max_chars = max_chars
+    def __init__(self, max_chars_by_lang=None, min_chars=20, model="exaone3.5:latest"):
+        self.max_chars_by_lang = max_chars_by_lang if max_chars_by_lang is not None else {"ko": 45, "default": 80}
         self.min_chars = min_chars
         self._punct = PunctuationSplit()
         self._ollama = OllamaSplit(model=model)
-        self.name = f"hybrid(max={max_chars}, min={min_chars})"
+        parts = ", ".join(f"{k}={v}" for k, v in self.max_chars_by_lang.items())
+        self.name = f"hybrid({parts})"
 
     def split(self, segment):
         cues = self._punct.split(segment)
@@ -167,7 +168,8 @@ class HybridSplit:
         # Sub-split any cue that's still over the threshold
         expanded = []
         for cue in cues:
-            if len(cue.text) > self.max_chars:
+            threshold = self.max_chars_by_lang.get(segment.language, self.max_chars_by_lang["default"])
+            if len(cue.text) > threshold:
                 cue_words = [w for w in segment.words
                              if w.end > cue.start and w.start < cue.end]
                 mini = Segment(segment.id, cue.start, cue.end, cue.text,

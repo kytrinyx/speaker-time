@@ -1,17 +1,26 @@
 # TODO
 
+## Ollama not splitting long English cues
+
+English cues over 80 chars trigger the Ollama sub-split, but Ollama sometimes returns the cue
+unsplit (falling back to the original). Needs prompt tuning or a fallback strategy (e.g. word-count
+split) so these cues don't silently pass through at full length.
+
 ## Filtering filler/non-verbal segments
 
-Should we filter out filler/non-verbal segments from transcripts entirely?
-- Korean laughter: repeated ㅋ characters (ㅋㅋㅋㅋ...)
-- Korean filler: repeated 아 characters (아아아아...) and similar
-- English laughter: "haha", "hehe", repeated laughter tokens, "[laughter]" markers, etc.
-- These add noise to subtitles without meaningful content
-- Where to filter: in `transcribe` (skip writing the row) or `create-vtt` (skip rendering)?
+Filter at the **cue level** in `create-vtt` (after splitting), not in `transcribe`, so raw data is preserved.
 
-## Start Ollama
+Rules per pattern:
 
-Let `./process` start the Ollama instance if it's not running.
+- **Bracket markers** (`[laughter]`, `[noise]`, etc.) → drop the cue
+- **Korean laughter consonants** (ㅋ-only, ㅎ-only strings) → drop
+- **Korean laughter syllables** (하하하, 호호호, 헤헤헤, etc.) → drop
+- **Korean filler vowels** (repeated 아 or 어):
+  - Collapse repeated runs to a single instance
+  - If the whole cue is just 아 or 어 after collapsing → drop
+  - If mixed with real content → keep with collapsed form
+- **Korean 음 alone** → keep
+- **English laughter** (haha, hehe, hoho, etc.) → drop
 
 ## `doctor` script
 
