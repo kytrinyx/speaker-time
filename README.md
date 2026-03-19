@@ -210,7 +210,6 @@ export HUGGINGFACE_SPEAKER_DIARIZATION=your_token_here
 ```
 
 ### 4. Verify Setup
-A `sample.mp3` is included in the repo. Its source is https://youtu.be/0rlG4kVKZ3E.
 
 Test your setup by running:
 ```bash
