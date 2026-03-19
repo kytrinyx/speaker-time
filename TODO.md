@@ -22,6 +22,10 @@ Rules per pattern:
 - **Korean 음 alone** → keep
 - **English laughter** (haha, hehe, hoho, etc.) → drop
 
+## Workflow for identifying long cues and selectively fixing them
+
+Starting point, see: bin/identify-long-cues, bin/split-cue
+
 ## `doctor` script
 
 A diagnostic/repair script that scans episode output for known transcription problems and optionally
