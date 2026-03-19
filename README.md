@@ -40,9 +40,9 @@ Downloads a YouTube video as MP3 and determines the next episode filename based 
 ./bin/download https://www.youtube.com/watch?v=... --jeep
 ```
 
-This counts existing `output/jeep*` directories to determine the episode number, downloads the audio as e.g. `audio/jeep-ep-004.mp3`, and prints the filename:
+This counts existing `output/jeep*` directories to determine the episode number, downloads the audio as e.g. `audio/jeep-ep-004.mp3`, and prints the basename:
 ```
-audio/jeep-ep-004.mp3
+jeep-ep-004
 ```
 
 **Output Structure:**
@@ -70,7 +70,7 @@ Performs speaker diarization and generates timeline CSV.
 
 **Usage:**
 ```bash
-./bin/diarize <audio_file>
+./bin/diarize <basename>
 ```
 
 #### `cut-audio`
@@ -78,7 +78,7 @@ Cuts audio into segments based on timeline CSV.
 
 **Usage:**
 ```bash
-./bin/cut-audio <audio_file>
+./bin/cut-audio <basename>
 ```
 
 #### `detect-language`
@@ -86,7 +86,7 @@ Generates language samples and detects speaker languages.
 
 **Usage:**
 ```bash
-./bin/detect-language <audio_file>
+./bin/detect-language <basename>
 ```
 
 #### `transcribe`
@@ -94,7 +94,7 @@ Transcribes audio segments with language hints. Captures word-level timestamps a
 
 **Usage:**
 ```bash
-./bin/transcribe <audio_file>
+./bin/transcribe <basename>
 ```
 
 **Output:**
@@ -106,12 +106,12 @@ Converts transcription CSV to WebVTT subtitle format. When `words.csv` is presen
 
 **Usage:**
 ```bash
-./bin/create-vtt <audiofile>
+./bin/create-vtt <basename>
 ```
 
 **Example:**
 ```bash
-./bin/create-vtt audio/sample.mp3
+./bin/create-vtt sample
 ```
 
 **Output:**
@@ -127,12 +127,12 @@ Analyzes speaking time statistics from timeline CSV. Useful for understanding sp
 
 **Usage:**
 ```bash
-./bin/compute-speaking-time <audiofile>
+./bin/compute-speaking-time <basename>
 ```
 
 **Example:**
 ```bash
-./bin/compute-speaking-time audio/sample.mp3
+./bin/compute-speaking-time sample
 ```
 
 **Output:**
@@ -213,7 +213,7 @@ export HUGGINGFACE_SPEAKER_DIARIZATION=your_token_here
 
 Test your setup by running:
 ```bash
-./bin/diarize audio/sample.mp3
+./bin/diarize sample
 ```
 
 ## File Formats
@@ -285,11 +285,11 @@ Segments with timeouts or errors produce no rows in this file.
 ./bin/download https://www.youtube.com/watch?v=... --jeep
 
 # Run individual steps on a local file
-./bin/diarize audio/interview.mp3
-./bin/cut-audio audio/interview.mp3
-./bin/detect-language audio/interview.mp3
-./bin/transcribe audio/interview.mp3
-./bin/create-vtt audio/interview.mp3
+./bin/diarize interview
+./bin/cut-audio interview
+./bin/detect-language interview
+./bin/transcribe interview
+./bin/create-vtt interview
 
 # View results
 ls output/interview/

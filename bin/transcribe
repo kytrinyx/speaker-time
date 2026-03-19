@@ -10,13 +10,11 @@ import signal
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: transcribe <audio_file>")
+        print("Usage: transcribe <basename>")
         sys.exit(1)
 
-    file_path = sys.argv[1]
+    base_name = sys.argv[1]
 
-    # Generate paths from audio file basename
-    base_name = os.path.splitext(os.path.basename(file_path))[0]
     output_dir = os.path.join("output", base_name)
     timeline_file = os.path.join(output_dir, "timeline.csv")
     metadata_file = os.path.join(output_dir, "metadata.json")

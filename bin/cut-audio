@@ -7,14 +7,12 @@ import ffmpeg
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: cut-audio <audio_file>")
+        print("Usage: cut-audio <basename>")
         sys.exit(1)
 
-    file_path = sys.argv[1]
-    absolute_path = os.path.abspath(file_path)
+    base_name = sys.argv[1]
+    absolute_path = os.path.abspath(os.path.join("audio", f"{base_name}.mp3"))
 
-    # Generate paths from audio file basename
-    base_name = os.path.splitext(os.path.basename(file_path))[0]
     output_dir = os.path.join("output", base_name)
     csv_filename = os.path.join(output_dir, "timeline.csv")
 

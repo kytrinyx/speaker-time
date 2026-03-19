@@ -7,14 +7,12 @@ from pyannote.audio import Pipeline
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: diarize <audio_file>")
+        print("Usage: diarize <basename>")
         sys.exit(1)
 
-    file_path = sys.argv[1]
-    absolute_path = os.path.abspath(file_path)
+    base_name = sys.argv[1]
+    absolute_path = os.path.abspath(os.path.join("audio", f"{base_name}.mp3"))
 
-    # Generate output directory and CSV filename
-    base_name = os.path.splitext(os.path.basename(file_path))[0]
     output_dir = os.path.join("output", base_name)
     os.makedirs(output_dir, exist_ok=True)
     csv_filename = os.path.join(output_dir, "timeline.csv")

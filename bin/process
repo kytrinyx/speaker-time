@@ -37,16 +37,15 @@ def main():
         sys.stderr.write(result.stderr)
         sys.exit(result.returncode)
 
-    audio_file = result.stdout.strip()
-    base_name = os.path.splitext(os.path.basename(audio_file))[0]
+    base_name = result.stdout.strip()
 
     try:
         # Run the pipeline steps in order
-        run_script("diarize", audio_file)
-        run_script("cut-audio", audio_file)
-        run_script("detect-language", audio_file)
-        run_script("transcribe", audio_file)
-        run_script("create-vtt", audio_file)
+        run_script("diarize", base_name)
+        run_script("cut-audio", base_name)
+        run_script("detect-language", base_name)
+        run_script("transcribe", base_name)
+        run_script("create-vtt", base_name)
 
         # Copy VTT file to Desktop
         vtt_file = os.path.join("output", base_name, f"{base_name}.vtt")
@@ -57,7 +56,7 @@ def main():
         else:
             print(f"Warning: VTT file not found at {vtt_file}")
 
-        print(f"\n=== Pipeline completed successfully for {audio_file} ===")
+        print(f"\n=== Pipeline completed successfully for {base_name} ===")
 
     except subprocess.CalledProcessError as e:
         print(f"Error: Pipeline failed at step with exit code {e.returncode}")
