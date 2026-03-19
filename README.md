@@ -120,6 +120,23 @@ Converts transcription CSV to WebVTT subtitle format. When `words.csv` is presen
 
 **Requires:** Ollama running locally (for sub-splitting long cues); uses `exaone3.5:latest` by default.
 
+### `split-cue`
+Re-runs the cue splitting logic for a single segment and patches the VTT file in place. Useful when `create-vtt` produces a long or poorly split cue and you want to fix just that one segment without rerunning the whole pipeline.
+
+**Usage:**
+```bash
+./bin/split-cue <basename> <segment_id>            # replace cues in the .vtt file
+./bin/split-cue <basename> <segment_id> --dry-run  # print new cues to stdout only
+```
+
+**Example:**
+```bash
+./bin/split-cue sample-ep-001 42            # apply the split
+./bin/split-cue sample-ep-001 42 --dry-run  # inspect proposed split
+```
+
+**Requires:** Ollama running locally (same as `create-vtt`).
+
 ## Analysis Tools
 
 ### `compute-speaking-time`
