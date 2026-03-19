@@ -40,9 +40,9 @@ Downloads a YouTube video as MP3 and determines the next episode filename based 
 ./bin/download https://www.youtube.com/watch?v=... --jeep
 ```
 
-This counts existing `output/jeep*` directories to determine the episode number, downloads the audio as e.g. `jeep-ep-004.mp3`, and prints the filename:
+This counts existing `output/jeep*` directories to determine the episode number, downloads the audio as e.g. `audio/jeep-ep-004.mp3`, and prints the filename:
 ```
-jeep-ep-004.mp3
+audio/jeep-ep-004.mp3
 ```
 
 **Output Structure:**
@@ -111,7 +111,7 @@ Converts transcription CSV to WebVTT subtitle format. When `words.csv` is presen
 
 **Example:**
 ```bash
-./bin/create-vtt sample.mp3
+./bin/create-vtt audio/sample.mp3
 ```
 
 **Output:**
@@ -132,7 +132,7 @@ Analyzes speaking time statistics from timeline CSV. Useful for understanding sp
 
 **Example:**
 ```bash
-./bin/compute-speaking-time sample.mp3
+./bin/compute-speaking-time audio/sample.mp3
 ```
 
 **Output:**
@@ -213,7 +213,7 @@ export HUGGINGFACE_SPEAKER_DIARIZATION=your_token_here
 
 Test your setup by running:
 ```bash
-./bin/diarize sample.mp3
+./bin/diarize audio/sample.mp3
 ```
 
 ## File Formats
@@ -285,15 +285,16 @@ Segments with timeouts or errors produce no rows in this file.
 ./bin/download https://www.youtube.com/watch?v=... --jeep
 
 # Run individual steps on a local file
-./bin/diarize interview.mp3
-./bin/cut-audio interview.mp3
-./bin/detect-language interview.mp3
-./bin/transcribe interview.mp3
-./bin/create-vtt interview.mp3
+./bin/diarize audio/interview.mp3
+./bin/cut-audio audio/interview.mp3
+./bin/detect-language audio/interview.mp3
+./bin/transcribe audio/interview.mp3
+./bin/create-vtt audio/interview.mp3
 
 # View results
 ls output/interview/
 # timeline.csv  audio/  language_detection/  metadata.json  transcription.csv  words.csv  interview.vtt
+
 ```
 
 ## Notes

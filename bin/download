@@ -29,18 +29,21 @@ def main():
     number = len(glob.glob(pattern)) + 1
     basename = f"{cohost}-ep-{number:03d}"
 
-    mp3_path = os.path.join(project_root, f"{basename}.mp3")
+    audio_dir = os.path.join(project_root, "audio")
+    os.makedirs(audio_dir, exist_ok=True)
+
+    mp3_path = os.path.join(audio_dir, f"{basename}.mp3")
     if os.path.exists(mp3_path):
-        print(f"{basename}.mp3 already exists.", file=sys.stderr)
+        print(f"audio/{basename}.mp3 already exists.", file=sys.stderr)
         sys.exit(1)
 
     subprocess.run(
         ["yt-dlp", "--extract-audio", "--audio-format=mp3",
-         "-o", f"{basename}.%(ext)s", url],
+         "-o", os.path.join(audio_dir, f"{basename}.%(ext)s"), url],
         check=True,
         stdout=sys.stderr,
     )
-    print(f"{basename}.mp3")
+    print(f"audio/{basename}.mp3")
 
 if __name__ == "__main__":
     main()
