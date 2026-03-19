@@ -24,11 +24,12 @@ def main():
     cohost = cohost_arg.lstrip("-")
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    pattern = os.path.join(script_dir, "output", f"{cohost}*")
+    project_root = os.path.dirname(script_dir)
+    pattern = os.path.join(project_root, "output", f"{cohost}*")
     number = len(glob.glob(pattern)) + 1
     basename = f"{cohost}-ep-{number:03d}"
 
-    mp3_path = os.path.join(script_dir, f"{basename}.mp3")
+    mp3_path = os.path.join(project_root, f"{basename}.mp3")
     if os.path.exists(mp3_path):
         print(f"{basename}.mp3 already exists.", file=sys.stderr)
         sys.exit(1)
