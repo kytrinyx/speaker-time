@@ -12,7 +12,7 @@ A complete audio processing pipeline that performs speaker diarization, language
 - **Transcription**: Generates full transcripts with speaker attribution
 - **VTT Subtitle Generation**: Creates WebVTT subtitle files from transcriptions
 
-## Scripts
+## Pipeline
 
 ### `process`
 Main entry point. Downloads a YouTube video and runs the complete pipeline.
@@ -63,9 +63,7 @@ output/
     └── sample.vtt                  # WebVTT subtitle file
 ```
 
-### Individual Pipeline Scripts
-
-#### `diarize`
+### `diarize`
 Performs speaker diarization and generates timeline CSV.
 
 **Usage:**
@@ -73,7 +71,7 @@ Performs speaker diarization and generates timeline CSV.
 ./bin/diarize <basename>
 ```
 
-#### `cut-audio`
+### `cut-audio`
 Cuts audio into segments based on timeline CSV.
 
 **Usage:**
@@ -81,7 +79,7 @@ Cuts audio into segments based on timeline CSV.
 ./bin/cut-audio <basename>
 ```
 
-#### `detect-language`
+### `detect-language`
 Generates language samples and detects speaker languages.
 
 **Usage:**
@@ -89,7 +87,7 @@ Generates language samples and detects speaker languages.
 ./bin/detect-language <basename>
 ```
 
-#### `transcribe`
+### `transcribe`
 Transcribes audio segments with language hints. Captures word-level timestamps alongside segment-level transcription.
 
 **Usage:**
@@ -101,7 +99,7 @@ Transcribes audio segments with language hints. Captures word-level timestamps a
 - `transcription.csv` — one row per speaker segment with full text
 - `words.csv` — one row per word with absolute timestamps and probability
 
-#### `create-vtt`
+### `create-vtt`
 Converts transcription CSV to WebVTT subtitle format. When `words.csv` is present, applies `HybridSplit` to produce shorter, more readable cues with accurate per-cue timestamps: first splits at sentence-ending punctuation, then uses a local Ollama model to sub-split any cue still over 80 characters.
 
 **Usage:**
@@ -121,21 +119,19 @@ Converts transcription CSV to WebVTT subtitle format. When `words.csv` is presen
 **Requires:** Ollama running locally (for sub-splitting long cues); uses `exaone3.5:latest` by default.
 
 
-## Targeted Repair Scripts
-
-Scripts for fixing individual segments without rerunning the full pipeline.
+## Tools
 
 ### `transcribe-cue`
 Re-transcribes a single audio segment and patches both `transcription.csv` and `words.csv` in place. Useful when a segment has a bad transcription and you want to fix just that one without rerunning the full transcription step.
 
 **Usage:**
 ```bash
-./bin/transcribe-cue <basename> <segment_id>
+./tools/transcribe-cue <basename> <segment_id>
 ```
 
 **Example:**
 ```bash
-./bin/transcribe-cue sample-ep-001 42
+./tools/transcribe-cue sample-ep-001 42
 ```
 
 **Requires:** Whisper model (same as `transcribe`).
@@ -145,48 +141,48 @@ Re-runs the cue splitting logic for a single segment and patches the VTT file in
 
 **Usage:**
 ```bash
-./bin/split-cue <basename> <segment_id>            # replace cues in the .vtt file
-./bin/split-cue <basename> <segment_id> --dry-run  # print new cues to stdout only
+./tools/split-cue <basename> <segment_id>            # replace cues in the .vtt file
+./tools/split-cue <basename> <segment_id> --dry-run  # print new cues to stdout only
 ```
 
 **Example:**
 ```bash
-./bin/split-cue sample-ep-001 42            # apply the split
-./bin/split-cue sample-ep-001 42 --dry-run  # inspect proposed split
+./tools/split-cue sample-ep-001 42            # apply the split
+./tools/split-cue sample-ep-001 42 --dry-run  # inspect proposed split
 ```
 
 **Requires:** Ollama running locally (same as `create-vtt`).
-
-## Analysis Tools
 
 ### `detect-language-file`
 Runs language detection on any audio file and prints the detected language and confidence score. Useful for checking individual language samples without running the full pipeline.
 
 **Usage:**
 ```bash
-./bin/detect-language-file <audio-file> [--debug]
+./tools/detect-language-file <audio-file> [--debug]
 ```
 
 **Example:**
 ```bash
-./bin/detect-language-file output/jeep-ep-023/language_detection/SPEAKER_02_language_sample.mp3 --debug
+./tools/detect-language-file output/jeep-ep-023/language_detection/SPEAKER_02_language_sample.mp3 --debug
 ```
 
 **Output:**
 - `language` and `confidence` for the detected language
 - With `--debug`: per-chunk language and confidence, a warning if chunks disagree on language, and stddev of the winning language's confidence across chunks
 
+## Scripts
+
 ### `compute-speaking-time`
 Analyzes speaking time statistics from timeline CSV. Useful for understanding speaker distribution and segment counts.
 
 **Usage:**
 ```bash
-./bin/compute-speaking-time <basename>
+./scripts/compute-speaking-time <basename>
 ```
 
 **Example:**
 ```bash
-./bin/compute-speaking-time sample
+./scripts/compute-speaking-time sample
 ```
 
 **Output:**
@@ -197,7 +193,7 @@ Scans all `output/*/transcription.csv` files and reports segments exceeding per-
 
 **Usage:**
 ```bash
-./bin/scan-long-segments
+./scripts/scan-long-segments
 ```
 
 **Output:**
@@ -209,16 +205,16 @@ Scans a VTT file for cues that exceed per-language character limits (45 for Kore
 
 **Usage:**
 ```bash
-./bin/identify-long-cues <basename>
+./scripts/identify-long-cues <basename>
 ```
 
 **Example:**
 ```bash
-./bin/identify-long-cues sample-ep-001
+./scripts/identify-long-cues sample-ep-001
 ```
 
 **Output:**
-- Appends `./bin/transcribe-cue` and `./bin/split-cue` lines to `todo-list.txt`
+- Appends `./tools/transcribe-cue` and `./tools/split-cue` lines to `todo-list.txt`
 - Prints a summary of violating cues and affected segments
 
 ### `find-foreign-chars`
@@ -226,16 +222,16 @@ Scans a `transcription.csv` for segments containing characters that are neither 
 
 **Usage:**
 ```bash
-./bin/find-foreign-chars <basename>
+./scripts/find-foreign-chars <basename>
 ```
 
 **Example:**
 ```bash
-./bin/find-foreign-chars sample-ep-001
+./scripts/find-foreign-chars sample-ep-001
 ```
 
 **Output:**
-- Appends `./bin/transcribe-cue` lines to `todo-list.txt`
+- Appends `./tools/transcribe-cue` lines to `todo-list.txt`
 - Prints a count of affected segments
 
 ### `speaker-airtime`
@@ -243,12 +239,12 @@ Shows airtime for a single speaker within an episode. Useful for checking whethe
 
 **Usage:**
 ```bash
-./bin/speaker-airtime <episode> <speaker>
+./scripts/speaker-airtime <episode> <speaker>
 ```
 
 **Example:**
 ```bash
-./bin/speaker-airtime jeep-ep-012 SPEAKER_03
+./scripts/speaker-airtime jeep-ep-012 SPEAKER_03
 ```
 
 **Output:**
@@ -259,12 +255,12 @@ Shows transcription segments with foreign characters for a specific speaker. Pri
 
 **Usage:**
 ```bash
-./bin/speaker-foreign-chars <episode> <speaker>
+./scripts/speaker-foreign-chars <episode> <speaker>
 ```
 
 **Example:**
 ```bash
-./bin/speaker-foreign-chars jeep-ep-023 SPEAKER_02
+./scripts/speaker-foreign-chars jeep-ep-023 SPEAKER_02
 ```
 
 **Output:**
@@ -275,15 +271,15 @@ Executes each command in a todo list file line by line. Pairs with `identify-lon
 
 **Usage:**
 ```bash
-./bin/run-todo [todo-file]
+./scripts/run-todo [todo-file]
 ```
 
 Defaults to `todo-list.txt` if no file is specified.
 
 **Example:**
 ```bash
-./bin/run-todo
-./bin/run-todo my-custom-list.txt
+./scripts/run-todo
+./scripts/run-todo my-custom-list.txt
 ```
 
 ### `test-cue-splitting`
@@ -291,7 +287,7 @@ Development tool for testing the `HybridSplit` strategy against a fixture datase
 
 **Usage:**
 ```bash
-./bin/test-cue-splitting
+./scripts/test-cue-splitting
 ```
 
 ## Dependencies
