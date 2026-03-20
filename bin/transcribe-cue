@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import csv
+import json
+import whisper
+import torch
+import signal
+import datetime
+
+
+def main():
+    if len(sys.argv) != 3:
+        print("Usage: transcribe-cue <basename> <segment_id>")
+        sys.exit(1)
+
+    base_name = sys.argv[1]
+    segment_id = int(sys.argv[2])
+
+    output_dir = os.path.join("output", base_name)
+    timeline_file = os.path.join(output_dir, "timeline.csv")
+    metadata_file = os.path.join(output_dir, "metadata.json")
+    transcription_file = os.path.join(output_dir, "transcription.csv")
+    words_file = os.path.join(output_dir, "words.csv")
+    audio_file = os.path.join(output_dir, "audio", f"{segment_id:06d}.mp3")
+
+    os.makedirs("logs", exist_ok=True)
+    log_file = os.path.join("logs", f"transcribe-cue.{base_name}.log")
+
+    for path in [timeline_file, transcription_file, audio_file]:
+        if not os.path.exists(path):
+            print(f"Error: {path} not found")
+            sys.exit(1)
+
+    # Read timeline row for this segment
+    timeline_row = None
+    with open(timeline_file) as f:
+        for row in csv.DictReader(f):
+            if int(row.get('segment_id', 0)) == segment_id:
+                timeline_row = row
+                break
+
+    # Fall back: timeline.csv may use positional index (1-based row number) without segment_id column
+    if timeline_row is None:
+        with open(timeline_file) as f:
+            reader = csv.DictReader(f)
+            for i, row in enumerate(reader, 1):
+                if i == segment_id:
+                    timeline_row = row
+                    break
+
+    if timeline_row is None:
+        print(f"Error: segment {segment_id} not found in {timeline_file}")
+        sys.exit(1)
+
+    speaker_id = timeline_row['SPEAKER_ID']
+    start_time = float(timeline_row['start_time'])
+    end_time = float(timeline_row['end_time'])
+
+    # Get language from metadata
+    language = "en"
+    if os.path.exists(metadata_file):
+        with open(metadata_file) as f:
+            metadata = json.load(f)
+            speaker_data = metadata.get(speaker_id, {})
+            language = speaker_data.get("language", "en")
+
+    print(f"Retranscribing segment {segment_id:06d} ({speaker_id}, {language})...")
+
+    # Load Whisper model
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    use_fp16 = device == "cuda"
+    model = whisper.load_model("small", device=device)
+
+    transcription_row = None
+    word_rows = []
+
+    try:
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Transcription timeout")
+
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(30)
+
+        try:
+            result = model.transcribe(audio_file, language=language, fp16=use_fp16, word_timestamps=True)
+            signal.alarm(0)
+
+            transcription_row = {
+                'speaker_id': speaker_id,
+                'segment_id': segment_id,
+                'start_time': start_time,
+                'end_time': end_time,
+                'text': result['text'].strip(),
+                'language': language,
+                'confidence': float(result.get('segments', [{}])[0].get('avg_logprob', 0.0)) if result.get('segments') else 0.0,
+            }
+
+            word_index = 0
+            for whisper_segment in result.get('segments', []):
+                for word_info in whisper_segment.get('words', []):
+                    word_rows.append({
+                        'segment_id': segment_id,
+                        'word_index': word_index,
+                        'word': word_info['word'],
+                        'start_time': round(start_time + word_info['start'], 3),
+                        'end_time': round(start_time + word_info['end'], 3),
+                        'probability': round(word_info.get('probability', 0.0), 4),
+                    })
+                    word_index += 1
+
+            print(f"Transcribed: {result['text'].strip()[:80]}")
+
+        except TimeoutError:
+            signal.alarm(0)
+            print(f"Timeout transcribing segment {segment_id:06d} (30s limit exceeded)")
+            transcription_row = {
+                'speaker_id': speaker_id,
+                'segment_id': segment_id,
+                'start_time': start_time,
+                'end_time': end_time,
+                'text': "[TIMEOUT]",
+                'language': language,
+                'confidence': 0.0,
+            }
+
+    except Exception as e:
+        print(f"Error transcribing segment {segment_id:06d}: {e}")
+        sys.exit(1)
+
+    # Replace matching row in transcription.csv
+    transcription_fieldnames = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
+    rows = []
+    replaced = False
+    before_text = None
+    with open(transcription_file) as f:
+        for row in csv.DictReader(f):
+            if int(row['segment_id']) == segment_id:
+                before_text = row.get('text', '')
+                rows.append(transcription_row)
+                replaced = True
+            else:
+                rows.append(row)
+
+    if not replaced:
+        rows.append(transcription_row)
+
+    with open(transcription_file, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=transcription_fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    print(f"Updated transcription.csv")
+
+    after_text = transcription_row['text']
+    timestamp = datetime.datetime.now().isoformat(timespec='seconds')
+    with open(log_file, 'a') as f:
+        f.write(f"[{timestamp}] segment {segment_id:06d}\n")
+        f.write(f"  before: {before_text}\n")
+        f.write(f"  after:  {after_text}\n")
+
+    # Upsert words.csv
+    words_fieldnames = ['segment_id', 'word_index', 'word', 'start_time', 'end_time', 'probability']
+    existing_words = []
+    if os.path.exists(words_file):
+        with open(words_file) as f:
+            for row in csv.DictReader(f):
+                if int(row['segment_id']) != segment_id:
+                    existing_words.append(row)
+
+    with open(words_file, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=words_fieldnames)
+        writer.writeheader()
+        writer.writerows(existing_words)
+        writer.writerows(word_rows)
+
+    print(f"Updated words.csv ({len(word_rows)} word rows)")
+
+
+if __name__ == "__main__":
+    main()

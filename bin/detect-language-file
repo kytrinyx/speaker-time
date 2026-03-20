@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import whisper
+
+sys.path.insert(0, os.path.dirname(__file__))
+from language_detector import detect_language
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    debug = "--debug" in sys.argv
+
+    if len(args) != 1:
+        print("Usage: detect-language-file <audio-file> [--debug]")
+        sys.exit(1)
+
+    audio_file = args[0]
+
+    if not os.path.exists(audio_file):
+        print(f"Error: File not found: {audio_file}")
+        sys.exit(1)
+
+    model = whisper.load_model("small")
+    result = detect_language(audio_file, model, debug=debug)
+
+    print(f"language: {result['language']}")
+    print(f"confidence: {result['confidence']:.3f}")
+
+
+if __name__ == "__main__":
+    main()

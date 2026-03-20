@@ -7,6 +7,9 @@ import json
 import ffmpeg
 import whisper
 
+sys.path.insert(0, os.path.dirname(__file__))
+from language_detector import detect_language
+
 def find_contiguous_segments(segments, gap_threshold=3.0):
     """Group segments by speaker and find contiguous periods within gap threshold."""
     speaker_groups = {}
@@ -141,21 +144,13 @@ def detect_speaker_languages(language_samples, output_dir):
 
     for speaker, sample_file in language_samples.items():
         try:
-            # Load and process audio for language detection
-            audio = whisper.load_audio(sample_file)
-            audio = whisper.pad_or_trim(audio)
-
-            # Create mel spectrogram
-            mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
-
-            # Detect language
-            _, probs = model.detect_language(mel)
-            detected_language = max(probs, key=probs.get)
-            confidence = probs[detected_language]
+            result = detect_language(sample_file, model)
+            detected_language = result["language"]
+            confidence = result["confidence"]
 
             speaker_languages[speaker] = {
                 "language": detected_language,
-                "confidence": float(confidence)
+                "confidence": confidence
             }
 
             print(f"{speaker}: {detected_language} (confidence: {confidence:.3f})")

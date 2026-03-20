@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import csv
+
+
+def format_duration(seconds):
+    """Convert seconds to human-readable format (HH:MM:SS.mmm)."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
+
+
+def main():
+    if len(sys.argv) != 3:
+        print("Usage: speaker-airtime <episode> <speaker>")
+        print("Example: speaker-airtime jeep-ep-023 SPEAKER_02")
+        sys.exit(1)
+
+    episode = sys.argv[1]
+    speaker = sys.argv[2]
+
+    timeline_file = os.path.join("output", episode, "timeline.csv")
+
+    if not os.path.exists(timeline_file):
+        print(f"Error: Timeline file not found: {timeline_file}", file=sys.stderr)
+        sys.exit(1)
+
+    speaker_time = 0.0
+    segment_count = 0
+    total_time = 0.0
+    speaker_found = False
+
+    with open(timeline_file, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            start_time = float(row['start_time'])
+            end_time = float(row['end_time'])
+            duration = end_time - start_time
+            total_time += duration
+
+            if row['SPEAKER_ID'] == speaker:
+                speaker_time += duration
+                segment_count += 1
+                speaker_found = True
+
+    if not speaker_found:
+        print(f"Error: Speaker {speaker} not found in {timeline_file}", file=sys.stderr)
+        sys.exit(1)
+
+    percentage = (speaker_time / total_time * 100) if total_time > 0 else 0
+    print(f"Speaker: {speaker} in {episode}")
+    print(f"Airtime: {format_duration(speaker_time)} ({percentage:.1f}% of total)")
+    print(f"Segments: {segment_count}")
+
+
+if __name__ == "__main__":
+    main()
