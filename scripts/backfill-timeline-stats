@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+
+import os
+import json
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
+from timeline import Timeline
+
+output_root = "output"
+
+for basename in sorted(os.listdir(output_root)):
+    episode_dir = os.path.join(output_root, basename)
+    if not os.path.isdir(episode_dir):
+        continue
+
+    metadata_file = os.path.join(episode_dir, "metadata.json")
+    timeline_file = os.path.join(episode_dir, "timeline.csv")
+
+    if not os.path.exists(metadata_file):
+        print(f"  skipping {basename}: no metadata.json")
+        continue
+    if not os.path.exists(timeline_file):
+        print(f"  skipping {basename}: no timeline.csv")
+        continue
+
+    with open(metadata_file) as f:
+        metadata = json.load(f)
+
+    timeline = Timeline.load(basename)
+    distribution = timeline.airtime_distribution()
+
+    for speaker in metadata:
+        if speaker not in distribution:
+            print(f"  {basename}/{speaker}: not in timeline, skipping")
+            continue
+
+        stats = timeline.segment_stats(speaker)
+        seg_count = sum(1 for spk, _, _ in timeline._segments if spk == speaker)
+        long_count = sum(1 for spk, start, end in timeline._segments if spk == speaker and end - start >= 30)
+
+        metadata[speaker]["airtime_seconds"] = round(timeline.airtime(speaker), 3)
+        metadata[speaker]["airtime_pct"] = round(distribution[speaker], 2)
+        metadata[speaker]["segments"] = seg_count
+        metadata[speaker]["long_segments"] = long_count
+        metadata[speaker]["longest"] = round(stats["longest"], 2)
+        metadata[speaker]["mean"] = round(stats["mean"], 2)
+        metadata[speaker]["stddev"] = round(stats["stddev"], 2)
+
+    with open(metadata_file, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    print(f"  updated {basename}")
