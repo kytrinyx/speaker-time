@@ -98,8 +98,8 @@ def main():
     todo_file = "todo-list.txt"
     with open(todo_file, "a") as f:
         for seg_id in segment_ids:
-            f.write(f"./bin/transcribe-cue {basename} {seg_id}\n")
-            f.write(f"./bin/split-cue {basename} {seg_id}\n")
+            f.write(f"./tools/transcribe-cue {basename} {seg_id}\n")
+            f.write(f"./tools/split-cue {basename} {seg_id}\n")
 
     print(f"Found {len(violating)} violating cue(s). Written {todo_file}.")
 

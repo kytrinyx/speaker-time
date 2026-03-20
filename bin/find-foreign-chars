@@ -42,7 +42,7 @@ def main():
         with open(transcription_file, encoding='utf-8') as f:
             for row in csv.DictReader(f):
                 if has_foreign(row['text']):
-                    out.write(f"./bin/transcribe-cue {basename} {row['segment_id']}\n")
+                    out.write(f"./tools/transcribe-cue {basename} {row['segment_id']}\n")
                     count += 1
 
     print(f"Found {count} segment(s) with foreign characters. Written {todo_file}.")
