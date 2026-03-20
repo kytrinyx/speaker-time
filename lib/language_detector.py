@@ -43,3 +43,21 @@ def detect_language(audio_file, model, debug=False):
             print(f"  stddev of '{detected_language}' confidence across chunks: {stddev:.3f}")
 
     return {"language": detected_language, "confidence": float(confidence)}
+
+
+def detect_file_language(audio_file, model):
+    """Detect the language of an audio file using the first 30 seconds.
+
+    Loads the audio, pads or trims to Whisper's 30-second context window,
+    and runs language detection once. The caller is responsible for ensuring
+    the audio file is short enough that using only the first 30 seconds is
+    acceptable.
+
+    Returns a dict: {"language": str, "confidence": float}
+    """
+    audio = whisper.load_audio(audio_file)
+    audio = whisper.pad_or_trim(audio)
+    mel = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
+    _, probs = model.detect_language(mel)
+    language = max(probs, key=probs.get)
+    return {"language": language, "confidence": float(probs[language])}

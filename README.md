@@ -57,14 +57,14 @@ output/
     ├── language_detection/          # Language detection samples
     │   ├── SPEAKER_00_language_sample.mp3
     │   └── SPEAKER_01_language_sample.mp3
-    ├── metadata.json               # Speaker language mapping
+    ├── metadata.json               # Speaker stats (from diarize) and language mapping (from detect-language)
     ├── transcription.csv           # Complete transcription data
     ├── words.csv                   # Word-level timestamps from transcription
     └── sample.vtt                  # WebVTT subtitle file
 ```
 
 ### `diarize`
-Performs speaker diarization and generates timeline CSV.
+Performs speaker diarization, generates timeline CSV, and writes initial per-speaker stats to `metadata.json`.
 
 **Usage:**
 ```bash
@@ -282,6 +282,17 @@ Defaults to `todo-list.txt` if no file is specified.
 ./scripts/run-todo my-custom-list.txt
 ```
 
+### `speaker-stats-csv`
+Outputs a CSV of per-speaker stats across all `jeep-*` and `katrina-*` episodes. Useful for analyzing speaker distributions and identifying diarization artifacts.
+
+**Usage:**
+```bash
+./scripts/speaker-stats-csv
+./scripts/speaker-stats-csv > speaker-stats.csv
+```
+
+**Output columns:** `episode, speaker, language, confidence, airtime_seconds, airtime_pct, segments, long_segments, longest, mean, stddev`
+
 ### `test-cue-splitting`
 Development tool for testing the `HybridSplit` strategy against a fixture dataset (`output/test-cues/`). Runs `PunctuationSplit` over the fixture segments and prints resulting cues with timestamps.
 
@@ -358,15 +369,20 @@ SPEAKER_01,22.80984719864177,24.558573853989813
 ```
 
 ### Metadata JSON (`metadata.json`)
+Written by `diarize` with per-speaker timeline stats, then enriched by `detect-language` with language and confidence.
+
 ```json
 {
   "SPEAKER_00": {
+    "airtime_seconds": 1403.616,
+    "airtime_pct": 54.56,
+    "segments": 463,
+    "long_segments": 0,
+    "longest": 22.9,
+    "mean": 3.03,
+    "stddev": 3.25,
     "language": "ko",
-    "confidence": 0.975
-  },
-  "SPEAKER_01": {
-    "language": "en",
-    "confidence": 0.999
+    "confidence": 0.991
   }
 }
 ```

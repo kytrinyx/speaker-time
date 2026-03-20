@@ -3,7 +3,11 @@
 import sys
 import os
 import csv
+import json
 from pyannote.audio import Pipeline
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
+from timeline import Timeline
 
 def main():
     if len(sys.argv) != 2:
@@ -74,6 +78,31 @@ def main():
 
     print(f"Timeline saved to: {csv_filename}")
     print(f"Total segments: {len(resolved_segments)}")
+
+    # Write per-speaker stats to metadata.json
+    timeline = Timeline.load(base_name)
+    distribution = timeline.airtime_distribution()
+    speakers = sorted(distribution)
+
+    metadata = {}
+    for speaker in speakers:
+        stats = timeline.segment_stats(speaker)
+        seg_count = sum(1 for spk, _, _ in timeline._segments if spk == speaker)
+        long_count = sum(1 for spk, start, end in timeline._segments if spk == speaker and end - start >= 30)
+        metadata[speaker] = {
+            "airtime_seconds": round(timeline.airtime(speaker), 3),
+            "airtime_pct": round(distribution[speaker], 2),
+            "segments": seg_count,
+            "long_segments": long_count,
+            "longest": round(stats["longest"], 2),
+            "mean": round(stats["mean"], 2),
+            "stddev": round(stats["stddev"], 2),
+        }
+
+    metadata_file = os.path.join(output_dir, "metadata.json")
+    with open(metadata_file, 'w') as f:
+        json.dump(metadata, f, indent=2)
+    print(f"Metadata saved to: {metadata_file}")
 
 if __name__ == "__main__":
     main()
