@@ -87,8 +87,8 @@ def main():
     metadata = {}
     for speaker in speakers:
         stats = timeline.segment_stats(speaker)
-        seg_count = sum(1 for spk, _, _ in timeline._segments if spk == speaker)
-        long_count = sum(1 for spk, start, end in timeline._segments if spk == speaker and end - start >= 30)
+        seg_count = sum(1 for s in timeline._segments if s.speaker_id == speaker)
+        long_count = sum(1 for s in timeline._segments if s.speaker_id == speaker and s.duration >= 30)
         metadata[speaker] = {
             "airtime_seconds": round(timeline.airtime(speaker), 3),
             "airtime_pct": round(distribution[speaker], 2),
@@ -96,7 +96,9 @@ def main():
             "long_segments": long_count,
             "longest": round(stats["longest"], 2),
             "mean": round(stats["mean"], 2),
+            "median": round(stats["median"], 2),
             "stddev": round(stats["stddev"], 2),
+            "skip": stats["median"] < 0.5,
         }
 
     metadata_file = os.path.join(output_dir, "metadata.json")

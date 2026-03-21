@@ -54,5 +54,6 @@ class Timeline:
         return {
             "longest": max(lengths),
             "mean": statistics.mean(lengths),
+            "median": statistics.median(lengths),
             "stddev": statistics.stdev(lengths) if len(lengths) > 1 else 0.0,
         }

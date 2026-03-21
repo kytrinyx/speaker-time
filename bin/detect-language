@@ -25,9 +25,19 @@ def main():
     log_dir = os.path.join("output", basename, "language_detection")
     os.makedirs(log_dir, exist_ok=True)
 
+    metadata_file = os.path.join("output", basename, "metadata.json")
+    metadata = {}
+    if os.path.exists(metadata_file):
+        with open(metadata_file) as f:
+            metadata = json.load(f)
+
     speaker_languages = {}
 
     for speaker_id in speakers:
+        if metadata.get(speaker_id, {}).get("skip"):
+            print(f"{speaker_id}: skipped (median segment duration too short)")
+            continue
+
         segments = [s for s in timeline._segments if s.speaker_id == speaker_id]
         log_path = os.path.join(log_dir, f"{speaker_id}.log.json")
         concat_path = os.path.join(log_dir, f"{speaker_id}.concatenated.mp3")
@@ -54,11 +64,6 @@ def main():
         speaker_languages[speaker_id] = language_entry
         print(f"{speaker_id}: {language_entry['language']} (confidence: {language_entry['confidence']:.3f})")
 
-    metadata_file = os.path.join("output", basename, "metadata.json")
-    metadata = {}
-    if os.path.exists(metadata_file):
-        with open(metadata_file) as f:
-            metadata = json.load(f)
     for speaker_id, lang_data in speaker_languages.items():
         metadata.setdefault(speaker_id, {}).update(lang_data)
     with open(metadata_file, "w") as f:
