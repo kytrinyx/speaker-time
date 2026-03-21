@@ -1,3 +1,4 @@
+import json
 import whisper
 
 
@@ -61,3 +62,22 @@ def detect_file_language(audio_file, model):
     _, probs = model.detect_language(mel)
     language = max(probs, key=probs.get)
     return {"language": language, "confidence": float(probs[language])}
+
+
+class SerialLanguageDetector:
+    CONFIDENCE_THRESHOLD = 0.9
+
+    def __init__(self, segments):
+        self._segments = sorted(segments, key=lambda s: s.duration, reverse=True)
+        self.log = []
+
+    def detect(self, model):
+        for segment in self._segments:
+            result = detect_file_language(segment.audio_path, model)
+            self.log.append({"path": segment.audio_path, **result})
+            if result["confidence"] >= self.CONFIDENCE_THRESHOLD:
+                return result["language"]
+
+    def write_log(self, path):
+        with open(path, "w") as f:
+            json.dump(self.log, f, indent=2)
