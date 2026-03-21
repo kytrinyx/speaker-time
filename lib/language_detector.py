@@ -1,4 +1,5 @@
 import json
+import os
 import whisper
 
 
@@ -64,6 +65,15 @@ def detect_file_language(audio_file, model):
     return {"language": language, "confidence": float(probs[language])}
 
 
+def _append_log(path, entries):
+    existing = []
+    if os.path.exists(path):
+        with open(path) as f:
+            existing = json.load(f)
+    with open(path, "w") as f:
+        json.dump(existing + entries, f, indent=2)
+
+
 class SerialLanguageDetector:
     CONFIDENCE_THRESHOLD = 0.9
 
@@ -79,5 +89,47 @@ class SerialLanguageDetector:
                 return result["language"]
 
     def write_log(self, path):
-        with open(path, "w") as f:
-            json.dump(self.log, f, indent=2)
+        _append_log(path, self.log)
+
+
+class ConcatenatingLanguageDetector:
+    CONFIDENCE_THRESHOLD = 0.9
+    TARGET_DURATION = 30.0
+
+    def __init__(self, segments):
+        self._segments = sorted(segments, key=lambda s: s.duration, reverse=True)
+        self.log = []
+
+    def detect(self, model, output_path):
+        import ffmpeg
+
+        selected = []
+        total = 0.0
+        for segment in self._segments:
+            if total >= self.TARGET_DURATION:
+                break
+            selected.append(segment)
+            total += segment.duration
+
+        if not selected:
+            return None
+
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        if len(selected) == 1:
+            import shutil
+            shutil.copy(selected[0].audio_path, output_path)
+        else:
+            inputs = [ffmpeg.input(s.audio_path) for s in selected]
+            joined = ffmpeg.concat(*inputs, v=0, a=1)
+            ffmpeg.output(joined, output_path).run(overwrite_output=True, quiet=True)
+
+        result = detect_file_language(output_path, model)
+        self.log.append({"path": output_path, **result})
+
+        if result["confidence"] >= self.CONFIDENCE_THRESHOLD:
+            return result["language"]
+        return None
+
+    def write_log(self, path):
+        _append_log(path, self.log)

@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
 from timeline import Timeline
-from language_detector import SerialLanguageDetector
+from language_detector import SerialLanguageDetector, ConcatenatingLanguageDetector
 
 import whisper
 
@@ -23,12 +23,19 @@ def main():
 
     model = whisper.load_model("small")
 
-    detector = SerialLanguageDetector(segments)
-    language = detector.detect(model)
-
     log_dir = os.path.join("output", episode_id, "language_detection")
     os.makedirs(log_dir, exist_ok=True)
-    detector.write_log(os.path.join(log_dir, f"{speaker_id}.log.json"))
+    log_path = os.path.join(log_dir, f"{speaker_id}.log.json")
+
+    detector = SerialLanguageDetector(segments)
+    language = detector.detect(model)
+    detector.write_log(log_path)
+
+    if language is None:
+        concat_path = os.path.join(log_dir, f"{speaker_id}.concatenated.mp3")
+        detector = ConcatenatingLanguageDetector(segments)
+        language = detector.detect(model, concat_path)
+        detector.write_log(log_path)
 
     print(language)
 
