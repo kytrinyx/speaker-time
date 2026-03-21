@@ -11,7 +11,7 @@ class Word:
 
 
 @dataclass
-class Segment:
+class TranscriptionSegment:
     id: int
     start: float
     end: float
@@ -172,7 +172,7 @@ class HybridSplit:
             if len(cue.text) > threshold:
                 cue_words = [w for w in segment.words
                              if w.end > cue.start and w.start < cue.end]
-                mini = Segment(segment.id, cue.start, cue.end, cue.text,
+                mini = TranscriptionSegment(segment.id, cue.start, cue.end, cue.text,
                                segment.language, cue_words)
                 sub_cues = self._ollama.split(mini)
                 expanded.extend(self._merge_short(sub_cues))
