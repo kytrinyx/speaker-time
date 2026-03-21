@@ -30,13 +30,18 @@ def main():
     for speaker_id in speakers:
         segments = [s for s in timeline._segments if s.speaker_id == speaker_id]
         log_path = os.path.join(log_dir, f"{speaker_id}.log.json")
+        concat_path = os.path.join(log_dir, f"{speaker_id}.concatenated.mp3")
 
-        detector = SerialLanguageDetector(segments)
-        language = detector.detect(model)
-        detector.write_log(log_path)
+        longest = max(s.duration for s in segments)
+
+        if longest >= 2.0:
+            detector = SerialLanguageDetector(segments)
+            language = detector.detect(model)
+            detector.write_log(log_path)
+        else:
+            language = None
 
         if language is None:
-            concat_path = os.path.join(log_dir, f"{speaker_id}.concatenated.mp3")
             detector = ConcatenatingLanguageDetector(segments)
             language = detector.detect(model, concat_path)
             detector.write_log(log_path)
