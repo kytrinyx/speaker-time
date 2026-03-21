@@ -1,70 +1,64 @@
 #!/usr/bin/env python3
 
 import os
-import json
 import sys
+import glob
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../lib"))
 from timeline import Timeline
-from language_detector import detect_file_language
+from language_detector import SerialLanguageDetector, ConcatenatingLanguageDetector
 
 import whisper
 
-print("episode,speaker,rank,segment_id,duration,language,confidence", flush=True)
 
-model = whisper.load_model("small")
+def detect_speaker(episode_id, speaker_id, model):
+    timeline = Timeline.load(episode_id)
+    segments = [s for s in timeline._segments if s.speaker_id == speaker_id]
 
-output_root = "output"
+    log_dir = os.path.join("output", episode_id, "language_detection")
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, f"{speaker_id}.log.json")
 
-for basename in sorted(os.listdir(output_root)):
-    episode_dir = os.path.join(output_root, basename)
-    if not os.path.isdir(episode_dir):
-        continue
+    detector = SerialLanguageDetector(segments)
+    language = detector.detect(model)
+    detector.write_log(log_path)
 
-    metadata_file = os.path.join(episode_dir, "metadata.json")
-    timeline_file = os.path.join(episode_dir, "timeline.csv")
-    audio_dir = os.path.join(episode_dir, "audio")
+    if language is None:
+        concat_path = os.path.join(log_dir, f"{speaker_id}.concatenated.mp3")
+        detector = ConcatenatingLanguageDetector(segments)
+        language = detector.detect(model, concat_path)
+        detector.write_log(log_path)
 
-    if not os.path.exists(metadata_file):
-        continue
-    if not os.path.exists(timeline_file):
-        continue
-    if not os.path.isdir(audio_dir):
-        continue
+    return language
 
-    with open(metadata_file) as f:
-        metadata = json.load(f)
 
-    timeline = Timeline.load(basename)
+def main():
+    output_dir = "output"
+    patterns = ["jeep-*", "katrina-*", "ian-*"]
 
-    for speaker in sorted(metadata):
-        candidates = [
-            (end - start, idx)
-            for idx, (spk, start, end) in enumerate(timeline._segments)
-            if spk == speaker and end - start
-        ]
+    basenames = []
+    for pattern in patterns:
+        matches = glob.glob(os.path.join(output_dir, pattern))
+        basenames.extend(os.path.basename(m) for m in matches if os.path.isdir(m))
+    basenames.sort()
 
-        if not candidates:
-            continue
+    basenames = [b for b in basenames if os.path.exists(os.path.join(output_dir, b, "timeline.csv"))]
 
-        candidates.sort(reverse=True)
-        top5 = candidates[:5]
+    if not basenames:
+        print("No episodes found.")
+        sys.exit(1)
 
-        found_high_confidence = False
+    model = whisper.load_model("small")
 
-        for rank, (duration, idx) in enumerate(top5, start=1):
-            segment_id = f"{idx + 1:06d}"
-            audio_file = os.path.join(audio_dir, f"{segment_id}.mp3")
+    for episode_id in basenames:
+        timeline = Timeline.load(episode_id)
+        speakers = sorted({s.speaker_id for s in timeline._segments})
 
-            if found_high_confidence or not os.path.exists(audio_file):
-                print(f"{basename},{speaker},{rank},{segment_id},{duration:.2f},-,-", flush=True)
-                continue
+        for speaker_id in speakers:
+            print(f"{episode_id} / {speaker_id} ...", end=" ", flush=True)
+            language = detect_speaker(episode_id, speaker_id, model)
+            print(language)
 
-            result = detect_file_language(audio_file, model)
-            language = result["language"]
-            confidence = result["confidence"]
 
-            print(f"{basename},{speaker},{rank},{segment_id},{duration:.2f},{language},{confidence:.4f}", flush=True)
-
-            if confidence >= 0.9:
-                found_high_confidence = True
+if __name__ == "__main__":
+    main()

@@ -6,9 +6,8 @@ A complete audio processing pipeline that performs speaker diarization, language
 
 - **Youtube Download**: Downloads a given youtube video
 - **Speaker Diarization**: Identifies different speakers and their speaking segments
-- **Overlap Resolution**: Handles overlapping speech by prioritizing the original speaker
-- **Language Detection**: Automatically detects the language spoken by each speaker
 - **Audio Segmentation**: Cuts original audio into individual speaker segments
+- **Language Detection**: Automatically detects the language spoken by each speaker
 - **Transcription**: Generates full transcripts with speaker attribution
 - **VTT Subtitle Generation**: Creates WebVTT subtitle files from transcriptions
 
@@ -172,134 +171,7 @@ Runs language detection on any audio file and prints the detected language and c
 
 ## Scripts
 
-### `compute-speaking-time`
-Analyzes speaking time statistics from timeline CSV. Useful for understanding speaker distribution and segment counts.
-
-**Usage:**
-```bash
-./scripts/compute-speaking-time <basename>
-```
-
-**Example:**
-```bash
-./scripts/compute-speaking-time sample
-```
-
-**Output:**
-- Displays speaking time breakdown by speaker with percentages and segment counts
-
-### `scan-long-segments`
-Scans all `output/*/transcription.csv` files and reports segments exceeding per-language character thresholds (45 for Korean, 100 for English). Useful for identifying candidates that benefit most from cue splitting.
-
-**Usage:**
-```bash
-./scripts/scan-long-segments
-```
-
-**Output:**
-- Writes `output/long-segments.csv` with all long segments
-- Prints a summary to stdout with the top 10 longest per language
-
-### `identify-long-cues`
-Scans a VTT file for cues that exceed per-language character limits (45 for Korean, 80 for English) and appends `transcribe-cue` and `split-cue` commands to `todo-list.txt` for each offending segment.
-
-**Usage:**
-```bash
-./scripts/identify-long-cues <basename>
-```
-
-**Example:**
-```bash
-./scripts/identify-long-cues sample-ep-001
-```
-
-**Output:**
-- Appends `./tools/transcribe-cue` and `./tools/split-cue` lines to `todo-list.txt`
-- Prints a summary of violating cues and affected segments
-
-### `find-foreign-chars`
-Scans a `transcription.csv` for segments containing characters that are neither ASCII nor Korean, and appends `transcribe-cue` commands to `todo-list.txt` for each match. Useful for catching OCR-style errors or segments transcribed in the wrong language.
-
-**Usage:**
-```bash
-./scripts/find-foreign-chars <basename>
-```
-
-**Example:**
-```bash
-./scripts/find-foreign-chars sample-ep-001
-```
-
-**Output:**
-- Appends `./tools/transcribe-cue` lines to `todo-list.txt`
-- Prints a count of affected segments
-
-### `speaker-airtime`
-Shows airtime for a single speaker within an episode. Useful for checking whether a suspect speaker is a real speaker or a diarization artifact.
-
-**Usage:**
-```bash
-./scripts/speaker-airtime <episode> <speaker>
-```
-
-**Example:**
-```bash
-./scripts/speaker-airtime jeep-ep-012 SPEAKER_03
-```
-
-**Output:**
-- Total airtime (HH:MM:SS.mmm), percentage of episode, and segment count
-
-### `speaker-foreign-chars`
-Shows transcription segments with foreign characters for a specific speaker. Prints to stdout rather than writing to `todo-list.txt` — useful for quick diagnostic checks.
-
-**Usage:**
-```bash
-./scripts/speaker-foreign-chars <episode> <speaker>
-```
-
-**Example:**
-```bash
-./scripts/speaker-foreign-chars jeep-ep-023 SPEAKER_02
-```
-
-**Output:**
-- Each garbled segment's `segment_id` and text, followed by a total count
-
-### `run-todo`
-Executes each command in a todo list file line by line. Pairs with `identify-long-cues` and `find-foreign-chars`, which populate the list, and `transcribe-cue`/`split-cue`, which do the actual repair work.
-
-**Usage:**
-```bash
-./scripts/run-todo [todo-file]
-```
-
-Defaults to `todo-list.txt` if no file is specified.
-
-**Example:**
-```bash
-./scripts/run-todo
-./scripts/run-todo my-custom-list.txt
-```
-
-### `speaker-stats-csv`
-Outputs a CSV of per-speaker stats across all `jeep-*` and `katrina-*` episodes. Useful for analyzing speaker distributions and identifying diarization artifacts.
-
-**Usage:**
-```bash
-./scripts/speaker-stats-csv
-./scripts/speaker-stats-csv > speaker-stats.csv
-```
-
-**Output columns:** `episode, speaker, language, confidence, airtime_seconds, airtime_pct, segments, long_segments, longest, mean, stddev`
-
-### `test-cue-splitting`
-Development tool for testing the `HybridSplit` strategy against a fixture dataset (`output/test-cues/`). Runs `PunctuationSplit` over the fixture segments and prints resulting cues with timestamps.
-
-**Usage:**
-```bash
-./scripts/test-cue-splitting
-```
+Ad-hoc scripts go in the `./scripts/` in order to not pollute `./bin`.
 
 ## Dependencies
 
@@ -386,7 +258,6 @@ Written by `diarize` with per-speaker timeline stats, then enriched by `detect-l
   }
 }
 ```
-
 ### Transcription CSV (`transcription.csv`)
 ```csv
 speaker_id,segment_id,start_time,end_time,text,language,confidence
@@ -407,21 +278,9 @@ Segments with timeouts or errors produce no rows in this file.
 
 ## Configuration
 
-- **Minimum Speaker Duration**: 20 seconds (speakers with less total time are skipped)
-- **Language Sample Duration**: 20-60 seconds per speaker
 - **Segment Gap Threshold**: 3 seconds (segments within 3s are considered contiguous)
 - **Transcription Timeout**: 30 seconds per audio segment
 - **Whisper Model**: Uses "small" model for balance of speed and accuracy (actually, tell a lie; it's because my computer can't handle bigger ones)
-
-## Workflow
-
-1. **Diarization**: Identifies speakers and their speaking times
-2. **Overlap Resolution**: Assigns overlapping segments to original speakers
-3. **Timeline Generation**: Creates CSV with precise timestamps
-4. **Audio Cutting**: Splits original audio into numbered segments
-5. **Language Detection**: Analyzes 20-60s samples to detect each speaker's language
-6. **Transcription**: Transcribes each segment using language-specific hints
-7. **VTT Generation**: Converts transcription to subtitle format
 
 ## Example Usage
 
@@ -439,19 +298,13 @@ Segments with timeouts or errors produce no rows in this file.
 ./bin/transcribe interview
 ./bin/create-vtt interview
 
-# View results
-ls output/interview/
-# timeline.csv  audio/  language_detection/  metadata.json  transcription.csv  words.csv  interview.vtt
-
 ```
 
 ## Notes
 
-- Empty segments and timeouts are handled gracefully
 - Audio segments are zero-padded (000001.mp3, 000002.mp3, etc.)
 - Language detection improves transcription accuracy for multilingual content
+- Pipeline scripts handle re-runs by skipping completed steps: `diarize` skips if timeline.csv exists, `cut-audio` and `transcribe` resume where they left off
+- Speaker diarization cannot guarantee same speaker id on multiple runs; if script crashes during diarization it will have to restart from scratch
 - VTT files exclude empty segments and timeout markers for clean subtitle output
 - `create-vtt` produces multiple cues per segment when `words.csv` is present; falls back to one cue per segment otherwise
-- All pipeline scripts efficiently handle re-runs by skipping completed steps: `diarize` skips if timeline.csv exists, `cut-audio` and `transcribe` resume where they left off
-- Speaker diarization cannot guarantee same speaker id on multiple runs; if script crashes during diarization it will have to restart from scratch
-- Use individual scripts for debugging or partial processing of the pipeline

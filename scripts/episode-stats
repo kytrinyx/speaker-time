@@ -17,7 +17,7 @@ def format_duration(seconds):
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: episode-speakers <basename>")
+        print("Usage: episode-stats <basename>")
         sys.exit(1)
 
     basename = sys.argv[1]
@@ -48,8 +48,8 @@ def main():
         airtime = timeline.airtime(speaker)
         pct = distribution[speaker]
         stats = timeline.segment_stats(speaker)
-        seg_count = sum(1 for spk, _, _ in timeline._segments if spk == speaker)
-        long_count = sum(1 for spk, start, end in timeline._segments if spk == speaker and end - start >= 30)
+        seg_count = sum(1 for s in timeline._segments if s.speaker_id == speaker)
+        long_count = sum(1 for s in timeline._segments if s.speaker_id == speaker and s.duration >= 30)
 
         print(f"{speaker}  {lang}  conf: {conf:.3f}")
         print(f"  airtime: {format_duration(airtime)} ({pct:.1f}%)  segments: {seg_count}  long: {long_count}")
