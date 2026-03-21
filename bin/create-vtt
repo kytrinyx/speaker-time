@@ -6,7 +6,7 @@ import csv
 import re
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from cue_splitter import Word, Segment, HybridSplit
+from cue_splitter import Word, TranscriptionSegment, HybridSplit
 
 
 def is_filler(text, lang):
@@ -50,7 +50,7 @@ def main():
                     Word(row["word"], float(row["start_time"]), float(row["end_time"]))
                 )
 
-    # Read transcription CSV and build Segment objects
+    # Read transcription CSV and build TranscriptionSegment objects
     segments = []
     with open(transcription_file) as f:
         for row in csv.DictReader(f):
@@ -59,7 +59,7 @@ def main():
             if not text or text == "[TIMEOUT]" or is_filler(text, lang):
                 continue
             sid = int(row["segment_id"])
-            segments.append(Segment(
+            segments.append(TranscriptionSegment(
                 id=sid,
                 start=float(row["start_time"]),
                 end=float(row["end_time"]),
