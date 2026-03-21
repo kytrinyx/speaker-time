@@ -3,9 +3,16 @@
 import sys
 import os
 import csv
+import re
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
 from cue_splitter import Word, Segment, HybridSplit
+
+
+def is_filler(text, lang):
+    if lang == "ko":
+        return bool(re.fullmatch(r'[ㅋㅎ아어고으\s]+', text))
+    return bool(re.fullmatch(r'[hH][aAeE]+([hH][aAeE]*)*[\s!.]*', text))
 
 
 def format_timestamp(seconds):
@@ -48,7 +55,8 @@ def main():
     with open(transcription_file) as f:
         for row in csv.DictReader(f):
             text = row["text"].strip()
-            if not text or text == "[TIMEOUT]":
+            lang = row.get("language", "")
+            if not text or text == "[TIMEOUT]" or is_filler(text, lang):
                 continue
             sid = int(row["segment_id"])
             segments.append(Segment(
@@ -56,7 +64,7 @@ def main():
                 start=float(row["start_time"]),
                 end=float(row["end_time"]),
                 text=text,
-                language=row.get("language", ""),
+                language=lang,
                 words=words_by_segment.get(sid, []),
             ))
 
