@@ -38,13 +38,15 @@ def main():
     use_fp16 = device == "cuda"
     model = whisper.load_model("small", device=device)
 
-    # Load metadata for language hints
+    # Load metadata for language hints and skip flags
     speaker_languages = {}
+    speaker_skip = {}
     if os.path.exists(metadata_file):
         with open(metadata_file, 'r') as f:
             metadata = json.load(f)
             for speaker, data in metadata.items():
                 speaker_languages[speaker] = data.get("language", "en")
+                speaker_skip[speaker] = data.get("skip", False)
 
     # Load timeline data
     timeline_data = []
@@ -92,6 +94,8 @@ def main():
             continue
 
         speaker_id = timeline_row['SPEAKER_ID']
+        if speaker_skip.get(speaker_id, False):
+            continue
         language = speaker_languages.get(speaker_id, "en")
 
         transcription_row = None
