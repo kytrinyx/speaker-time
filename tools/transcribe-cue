@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../
 from transcript import Transcript
 from prompts import build_prompts
 from transcriber import Transcriber
+from words import Words
 
 
 
@@ -102,23 +103,10 @@ def main():
             for row in all_rows:
                 f.write(f"  [{row['language']}] confidence={float(row['confidence']):.4f} text={row['text'][:80]}\n")
 
-    # Upsert words.csv
-    words_fieldnames = ['segment_id', 'language', 'word_index', 'word', 'start_time', 'end_time', 'probability']
-    languages_written = {row['language'] for row in all_words}
-    existing_words = []
-    if os.path.exists(words_file):
-        with open(words_file) as f:
-            for row in csv.DictReader(f):
-                if not (int(row['segment_id']) == segment_id and row.get('language') in languages_written):
-                    row.setdefault('language', '')
-                    existing_words.append(row)
-
-    with open(words_file, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=words_fieldnames)
-        writer.writeheader()
-        writer.writerows(existing_words)
-        writer.writerows(all_words)
-
+    languages = {row['language'] for row in all_rows}
+    words = Words.load(words_file)
+    words.upsert_segment(segment_id, all_words, languages)
+    words.save()
     print(f"Updated words.csv ({len(all_words)} word rows)")
 
 

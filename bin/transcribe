@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lib.transcript import Transcript
 from lib.prompts import build_prompts
 from lib.transcriber import Transcriber
+from lib.words import Words
 
 
 def main():
@@ -58,12 +59,7 @@ def main():
     transcription_file = os.path.join(output_dir, "transcription.csv")
     words_file = os.path.join(output_dir, "words.csv")
     transcript = Transcript.load(transcription_file)
-
-    if not os.path.exists(words_file):
-        with open(words_file, 'w', newline='') as csvfile:
-            fieldnames = ['segment_id', 'language', 'word_index', 'word', 'start_time', 'end_time', 'probability']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
+    words_csv = Words.load(words_file)
 
     # Transcribe each audio segment
     transcribed_count = 0
@@ -97,11 +93,9 @@ def main():
             transcript.upsert(row)
         transcript.save()
 
-        if words:
-            with open(words_file, 'a', newline='') as csvfile:
-                fieldnames = ['segment_id', 'language', 'word_index', 'word', 'start_time', 'end_time', 'probability']
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writerows(words)
+        languages = {row['language'] for row in rows}
+        words_csv.upsert_segment(i, words, languages)
+        words_csv.save()
 
         transcribed_count += 1
 

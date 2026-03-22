@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import csv
+import json
+import shutil
+import subprocess
+import datetime
+
+scripts_dir = os.path.dirname(os.path.abspath(__file__))
+repo_dir = os.path.dirname(scripts_dir)
+
+sys.path.insert(0, os.path.join(repo_dir, 'lib'))
+from transcript import Transcript
+from prompts import build_prompts
+from transcriber import Transcriber
+from words import Words
+
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: doctor <basename>")
+        sys.exit(1)
+
+    base_name = sys.argv[1]
+    output_dir = os.path.join(repo_dir, "output", base_name)
+    timeline_file = os.path.join(output_dir, "timeline.csv")
+    metadata_file = os.path.join(output_dir, "metadata.json")
+    transcription_file = os.path.join(output_dir, "transcription.csv")
+    words_file = os.path.join(output_dir, "words.csv")
+
+    for path in [timeline_file, transcription_file]:
+        if not os.path.exists(path):
+            print(f"Error: {path} not found")
+            sys.exit(1)
+
+    metadata = {}
+    if os.path.exists(metadata_file):
+        with open(metadata_file) as f:
+            metadata = json.load(f)
+
+    transcript = Transcript.load(transcription_file)
+
+    # Find all segments that need transcription
+    segments = []  # list of (segment_id, speaker_id, language, start_time, end_time, audio_file)
+    with open(timeline_file) as f:
+        for i, row in enumerate(csv.DictReader(f), 1):
+            segment_id = int(row.get('segment_id', i))
+            speaker_id = row['SPEAKER_ID']
+            language = metadata.get(speaker_id, {}).get('language', 'en')
+            if transcript.needs_transcription(segment_id, language):
+                audio_file = os.path.join(output_dir, "audio", f"{segment_id:06d}.mp3")
+                segments.append((segment_id, speaker_id, language, float(row['start_time']), float(row['end_time']), audio_file))
+
+    if not segments:
+        print("No segments need transcription.")
+        return
+
+    print(f"Found {len(segments)} segments needing transcription.")
+
+    today = datetime.date.today().strftime("%Y-%m-%d")
+    backup_file = os.path.join(output_dir, f"bk.{today}.transcription.csv")
+    shutil.copy2(transcription_file, backup_file)
+    print(f"Backed up transcription.csv to {os.path.basename(backup_file)}")
+
+    if os.path.exists(words_file):
+        words_backup = os.path.join(output_dir, f"bk.{today}.words.csv")
+        shutil.copy2(words_file, words_backup)
+        print(f"Backed up words.csv to {os.path.basename(words_backup)}")
+
+    transcriber = Transcriber(build_prompts(base_name))
+
+    words_csv = Words.load(words_file)
+
+    for segment_id, speaker_id, language, start_time, end_time, audio_file in segments:
+        if not os.path.exists(audio_file):
+            print(f"Warning: audio file not found for segment {segment_id:06d}, skipping")
+            continue
+
+        print(f"Retranscribing segment {segment_id:06d} ({speaker_id}, {language})...")
+        try:
+            rows, new_words = transcriber.transcribe_segment(
+                audio_file, segment_id, speaker_id, language, start_time, end_time
+            )
+        except Exception as e:
+            print(f"Error transcribing segment {segment_id:06d}: {e}")
+            continue
+
+        for row in rows:
+            transcript.upsert(row)
+        transcript.save()
+
+        languages = {row['language'] for row in rows}
+        words_csv.upsert_segment(segment_id, new_words, languages)
+        words_csv.save()
+        print(f"Updated words.csv ({len(new_words)} word rows for segment {segment_id:06d})")
+
+    split_segments = os.path.join(repo_dir, "bin", "split-segments")
+    result = subprocess.run([split_segments, base_name], cwd=repo_dir)
+    if result.returncode != 0:
+        print("Error running split-segments")
+        sys.exit(1)
+
+    create_vtt = os.path.join(repo_dir, "bin", "create-vtt")
+    result = subprocess.run([create_vtt, base_name], cwd=repo_dir)
+    if result.returncode != 0:
+        print("Error running create-vtt")
+        sys.exit(1)
+
+    vtt_src = os.path.join(output_dir, f"{base_name}.vtt")
+    vtt_dst = os.path.expanduser(f"~/Desktop/{base_name}.vtt")
+    shutil.copy2(vtt_src, vtt_dst)
+    print(f"Copied to {vtt_dst}")
+
+
+if __name__ == "__main__":
+    main()
