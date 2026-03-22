@@ -48,9 +48,9 @@ def main():
     for row in transcript:
         text = row["text"].strip()
         lang = row.get("language", "")
-        if not text or text == "[TIMEOUT]" or is_filler(text, lang):
-            continue
         sid = int(row["segment_id"])
+        if not text or text == "[TIMEOUT]" or is_filler(text, lang) or transcript.low_confidence(sid, lang):
+            continue
         segment_count += 1
 
         cached = split_cache.get(str(sid))
