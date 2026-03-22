@@ -128,7 +128,7 @@ def main():
                 if not text or text == "[TIMEOUT]":
                     print(f"Error: segment {segment_id} has no usable text")
                     sys.exit(1)
-                segment = Segment(
+                segment = TranscriptionSegment(
                     id=segment_id,
                     start=float(row["start_time"]),
                     end=float(row["end_time"]),
