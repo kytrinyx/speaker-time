@@ -3,100 +3,18 @@
 import sys
 import os
 import csv
-import re
+import json
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
 from segment_splitter import Word, TranscriptionSegment, HybridSplit
+from transcript import Transcript
 
 
 def format_timestamp(seconds):
-    """Convert seconds to VTT timestamp format (HH:MM:SS.mmm)."""
     hours = int(seconds // 3600)
     minutes = int((seconds % 3600) // 60)
     secs = seconds % 60
     return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
-
-
-def parse_timestamp(ts):
-    """Parse VTT timestamp (HH:MM:SS.mmm) to seconds."""
-    m = re.match(r'(\d+):(\d+):(\d+\.\d+)', ts)
-    if not m:
-        return None
-    return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
-
-
-def parse_vtt_blocks(text):
-    """Split VTT content into (header, [blocks]) where each block is a list of lines."""
-    lines = text.splitlines()
-    # Collect header (WEBVTT + any blank lines before first cue)
-    i = 0
-    header_lines = []
-    while i < len(lines) and not re.match(r'\d+:\d+:\d+', lines[i]):
-        header_lines.append(lines[i])
-        i += 1
-    # Collect cue blocks separated by blank lines
-    blocks = []
-    current = []
-    while i < len(lines):
-        line = lines[i]
-        if line.strip() == "":
-            if current:
-                blocks.append(current)
-                current = []
-        else:
-            current.append(line)
-        i += 1
-    if current:
-        blocks.append(current)
-    return header_lines, blocks
-
-
-def patch_vtt(vtt_file, segment_start, segment_end, new_cues):
-    with open(vtt_file) as f:
-        content = f.read()
-
-    header_lines, blocks = parse_vtt_blocks(content)
-
-    EPSILON = 0.01
-
-    # Find the slice of blocks belonging to this segment
-    first = None
-    last = None
-    for i, block in enumerate(blocks):
-        ts_line = block[0]
-        m = re.match(r'([\d:\.]+)\s+-->\s+([\d:\.]+)', ts_line)
-        if not m:
-            continue
-        cue_start = parse_timestamp(m.group(1))
-        cue_end = parse_timestamp(m.group(2))
-        if cue_start is not None and cue_end is not None:
-            if cue_start >= segment_start - EPSILON and cue_end <= segment_end + EPSILON:
-                if first is None:
-                    first = i
-                last = i
-
-    if first is None:
-        print(f"Error: no VTT cues found in range [{segment_start}, {segment_end}]", file=sys.stderr)
-        sys.exit(1)
-
-    old_count = last - first + 1
-    new_blocks = [
-        [f"{format_timestamp(c.start)} --> {format_timestamp(c.end)}", c.text]
-        for c in new_cues
-    ]
-
-    patched_blocks = blocks[:first] + new_blocks + blocks[last + 1:]
-
-    lines = header_lines[:]
-    for block in patched_blocks:
-        for line in block:
-            lines.append(line)
-        lines.append("")
-
-    with open(vtt_file, "w") as f:
-        f.write("\n".join(lines) + "\n")
-
-    print(f"Patched {old_count} cue{'s' if old_count != 1 else ''} → {len(new_cues)} cue{'s' if len(new_cues) != 1 else ''} in {vtt_file}", file=sys.stderr)
 
 
 def main():
@@ -114,39 +32,34 @@ def main():
 
     transcription_file = os.path.join("output", basename, "transcription.csv")
     words_file = os.path.join("output", basename, "words.csv")
-    vtt_file = os.path.join("output", basename, f"{basename}.vtt")
+    cache_file = os.path.join("output", basename, "split_segments.json")
 
-    if not os.path.exists(transcription_file):
-        print(f"Error: {transcription_file} not found")
-        sys.exit(1)
+    transcript = Transcript.load(transcription_file)
+    row = next((r for r in transcript if int(r["segment_id"]) == segment_id), None)
 
-    segment = None
-    with open(transcription_file) as f:
-        for row in csv.DictReader(f):
-            if int(row["segment_id"]) == segment_id:
-                text = row["text"].strip()
-                if not text or text == "[TIMEOUT]":
-                    print(f"Error: segment {segment_id} has no usable text")
-                    sys.exit(1)
-                segment = TranscriptionSegment(
-                    id=segment_id,
-                    start=float(row["start_time"]),
-                    end=float(row["end_time"]),
-                    text=text,
-                    language=row.get("language", ""),
-                )
-                break
-
-    if segment is None:
+    if row is None:
         print(f"Error: segment {segment_id} not found in {transcription_file}")
         sys.exit(1)
+
+    text = row["text"].strip()
+    if not text or text == "[TIMEOUT]":
+        print(f"Error: segment {segment_id} has no usable text")
+        sys.exit(1)
+
+    segment = TranscriptionSegment(
+        id=segment_id,
+        start=float(row["start_time"]),
+        end=float(row["end_time"]),
+        text=text,
+        language=row.get("language", ""),
+    )
 
     words = []
     if os.path.exists(words_file):
         with open(words_file) as f:
-            for row in csv.DictReader(f):
-                if int(row["segment_id"]) == segment_id:
-                    words.append(Word(row["word"], float(row["start_time"]), float(row["end_time"])))
+            for word_row in csv.DictReader(f):
+                if int(word_row["segment_id"]) == segment_id and word_row.get("language") == row.get("language"):
+                    words.append(Word(word_row["word"], float(word_row["start_time"]), float(word_row["end_time"])))
 
     segment.words = words
 
@@ -158,10 +71,20 @@ def main():
             print(cue.text)
             print()
     else:
-        if not os.path.exists(vtt_file):
-            print(f"Error: {vtt_file} not found")
-            sys.exit(1)
-        patch_vtt(vtt_file, segment.start, segment.end, cues)
+        cache = {}
+        if os.path.exists(cache_file):
+            with open(cache_file) as f:
+                cache = json.load(f)
+
+        cache[str(segment_id)] = {
+            "source": text,
+            "cues": [{"text": c.text, "start": c.start, "end": c.end} for c in cues],
+        }
+
+        with open(cache_file, "w") as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+
+        print(f"Updated split_segments.json: segment {segment_id} → {len(cues)} cue{'s' if len(cues) != 1 else ''}")
 
 
 if __name__ == "__main__":
