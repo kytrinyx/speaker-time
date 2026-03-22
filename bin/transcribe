@@ -7,6 +7,8 @@ import json
 import whisper
 import torch
 import signal
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lib.transcript import Transcript
 
 def main():
     if len(sys.argv) != 2:
@@ -55,25 +57,11 @@ def main():
         for row in reader:
             timeline_data.append(row)
 
-    # Check for existing transcription to resume from
     transcription_file = os.path.join(output_dir, "transcription.csv")
     words_file = os.path.join(output_dir, "words.csv")
-    last_completed_segment = 0
+    transcript = Transcript.load(transcription_file)
 
-    if os.path.exists(transcription_file):
-        with open(transcription_file, 'r') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                segment_id = int(row['segment_id'])
-                if segment_id > last_completed_segment:
-                    last_completed_segment = segment_id
-        print(f"Resuming transcription from segment {last_completed_segment + 1}")
-    else:
-        # Create new files with headers
-        with open(transcription_file, 'w', newline='') as csvfile:
-            fieldnames = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
+    if not os.path.exists(words_file):
         with open(words_file, 'w', newline='') as csvfile:
             fieldnames = ['segment_id', 'word_index', 'word', 'start_time', 'end_time', 'probability']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -83,8 +71,12 @@ def main():
     transcribed_count = 0
 
     for i, timeline_row in enumerate(timeline_data, 1):
-        # Skip already transcribed segments
-        if i <= last_completed_segment:
+        speaker_id = timeline_row['SPEAKER_ID']
+        if speaker_skip.get(speaker_id, False):
+            continue
+        language = speaker_languages.get(speaker_id, "en")
+
+        if transcript.contains(i, language):
             continue
 
         segment_file = os.path.join(audio_dir, f"{i:06d}.mp3")
@@ -92,11 +84,6 @@ def main():
         if not os.path.exists(segment_file):
             print(f"Warning: Audio segment {segment_file} not found")
             continue
-
-        speaker_id = timeline_row['SPEAKER_ID']
-        if speaker_skip.get(speaker_id, False):
-            continue
-        language = speaker_languages.get(speaker_id, "en")
 
         transcription_row = None
         word_rows = []
@@ -164,12 +151,9 @@ def main():
                 'confidence': 0.0
             }
 
-        # Write transcription result immediately to CSV
         if transcription_row:
-            with open(transcription_file, 'a', newline='') as csvfile:
-                fieldnames = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writerow(transcription_row)
+            transcript.upsert(transcription_row)
+            transcript.save()
             if word_rows:
                 with open(words_file, 'a', newline='') as csvfile:
                     fieldnames = ['segment_id', 'word_index', 'word', 'start_time', 'end_time', 'probability']
