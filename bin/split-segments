@@ -8,6 +8,7 @@ import re
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
 from segment_splitter import Word, TranscriptionSegment, HybridSplit
+from transcript import Transcript
 
 
 def is_filler(text, lang):
@@ -26,11 +27,6 @@ def main():
     transcription_file = os.path.join("output", basename, "transcription.csv")
     words_file = os.path.join("output", basename, "words.csv")
     cache_file = os.path.join("output", basename, "split_segments.json")
-
-    if not os.path.exists(transcription_file):
-        print(f"Error: Transcription file not found: {transcription_file}")
-        print("Run 'transcribe' first.")
-        sys.exit(1)
 
     if not os.path.exists(words_file):
         print("No words file found; nothing to split.")
@@ -51,25 +47,24 @@ def main():
                 Word(row["word"], float(row["start_time"]), float(row["end_time"]))
             )
 
-    # Read transcription segments
+    transcript = Transcript.load(transcription_file)
     segments = []
-    with open(transcription_file) as f:
-        for row in csv.DictReader(f):
-            text = row["text"].strip()
-            lang = row.get("language", "")
-            if not text or text == "[TIMEOUT]" or is_filler(text, lang):
-                continue
-            sid = int(row["segment_id"])
-            if sid not in words_by_segment:
-                continue
-            segments.append(TranscriptionSegment(
-                id=sid,
-                start=float(row["start_time"]),
-                end=float(row["end_time"]),
-                text=text,
-                language=lang,
-                words=words_by_segment[sid],
-            ))
+    for row in transcript:
+        text = row["text"].strip()
+        lang = row.get("language", "")
+        if not text or text == "[TIMEOUT]" or is_filler(text, lang):
+            continue
+        sid = int(row["segment_id"])
+        if sid not in words_by_segment:
+            continue
+        segments.append(TranscriptionSegment(
+            id=sid,
+            start=float(row["start_time"]),
+            end=float(row["end_time"]),
+            text=text,
+            language=lang,
+            words=words_by_segment[sid],
+        ))
 
     splitter = HybridSplit()
     split_count = 0
