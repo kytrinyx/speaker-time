@@ -1,6 +1,8 @@
 import csv
 import os
 
+from corrections import apply as apply_corrections
+
 FIELDNAMES = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
 
 
@@ -49,4 +51,6 @@ class Transcript:
             if segment_id not in by_segment or float(row['confidence']) > float(by_segment[segment_id]['confidence']):
                 by_segment[segment_id] = row
         for segment_id in sorted(by_segment):
-            yield by_segment[segment_id]
+            row = dict(by_segment[segment_id])
+            row['text'] = apply_corrections(row['text'])
+            yield row

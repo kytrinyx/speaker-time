@@ -56,46 +56,45 @@ def main():
 
     if not segments:
         print("No segments need transcription.")
-        return
+    else:
+        print(f"Found {len(segments)} segments needing transcription.")
 
-    print(f"Found {len(segments)} segments needing transcription.")
+        today = datetime.date.today().strftime("%Y-%m-%d")
+        backup_file = os.path.join(output_dir, f"bk.{today}.transcription.csv")
+        shutil.copy2(transcription_file, backup_file)
+        print(f"Backed up transcription.csv to {os.path.basename(backup_file)}")
 
-    today = datetime.date.today().strftime("%Y-%m-%d")
-    backup_file = os.path.join(output_dir, f"bk.{today}.transcription.csv")
-    shutil.copy2(transcription_file, backup_file)
-    print(f"Backed up transcription.csv to {os.path.basename(backup_file)}")
+        if os.path.exists(words_file):
+            words_backup = os.path.join(output_dir, f"bk.{today}.words.csv")
+            shutil.copy2(words_file, words_backup)
+            print(f"Backed up words.csv to {os.path.basename(words_backup)}")
 
-    if os.path.exists(words_file):
-        words_backup = os.path.join(output_dir, f"bk.{today}.words.csv")
-        shutil.copy2(words_file, words_backup)
-        print(f"Backed up words.csv to {os.path.basename(words_backup)}")
+        transcriber = Transcriber(build_prompts(base_name))
 
-    transcriber = Transcriber(build_prompts(base_name))
+        words_csv = Words.load(words_file)
 
-    words_csv = Words.load(words_file)
+        for segment_id, speaker_id, language, start_time, end_time, audio_file in segments:
+            if not os.path.exists(audio_file):
+                print(f"Warning: audio file not found for segment {segment_id:06d}, skipping")
+                continue
 
-    for segment_id, speaker_id, language, start_time, end_time, audio_file in segments:
-        if not os.path.exists(audio_file):
-            print(f"Warning: audio file not found for segment {segment_id:06d}, skipping")
-            continue
+            print(f"Retranscribing segment {segment_id:06d} ({speaker_id}, {language})...")
+            try:
+                rows, new_words = transcriber.transcribe_segment(
+                    audio_file, segment_id, speaker_id, language, start_time, end_time
+                )
+            except Exception as e:
+                print(f"Error transcribing segment {segment_id:06d}: {e}")
+                continue
 
-        print(f"Retranscribing segment {segment_id:06d} ({speaker_id}, {language})...")
-        try:
-            rows, new_words = transcriber.transcribe_segment(
-                audio_file, segment_id, speaker_id, language, start_time, end_time
-            )
-        except Exception as e:
-            print(f"Error transcribing segment {segment_id:06d}: {e}")
-            continue
+            for row in rows:
+                transcript.upsert(row)
+            transcript.save()
 
-        for row in rows:
-            transcript.upsert(row)
-        transcript.save()
-
-        languages = {row['language'] for row in rows}
-        words_csv.upsert_segment(segment_id, new_words, languages)
-        words_csv.save()
-        print(f"Updated words.csv ({len(new_words)} word rows for segment {segment_id:06d})")
+            languages = {row['language'] for row in rows}
+            words_csv.upsert_segment(segment_id, new_words, languages)
+            words_csv.save()
+            print(f"Updated words.csv ({len(new_words)} word rows for segment {segment_id:06d})")
 
     cache_file = os.path.join(output_dir, "split_segments.json")
     cache = {}
