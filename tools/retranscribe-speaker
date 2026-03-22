@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import csv
+import json
+import shutil
+import subprocess
+
+scripts_dir = os.path.dirname(os.path.abspath(__file__))
+repo_dir = os.path.dirname(scripts_dir)
+
+
+def main():
+    if len(sys.argv) != 3:
+        print("Usage: retranscribe-speaker <episode_id> <speaker_id>")
+        sys.exit(1)
+
+    episode_id = sys.argv[1]
+    speaker_id = sys.argv[2]
+
+    output_dir = os.path.join(repo_dir, "output", episode_id)
+    metadata_file = os.path.join(output_dir, "metadata.json")
+    timeline_file = os.path.join(output_dir, "timeline.csv")
+    log_file = os.path.join(output_dir, "language_detection", f"{speaker_id}.log.json")
+
+    for path in [metadata_file, timeline_file, log_file]:
+        if not os.path.exists(path):
+            print(f"Error: {path} not found")
+            sys.exit(1)
+
+    # Step 1: Update metadata language from log
+    with open(log_file) as f:
+        entries = json.load(f)
+
+    if not entries:
+        print(f"Error: {log_file} is empty")
+        sys.exit(1)
+
+    log_language = entries[-1]["language"]
+
+    with open(metadata_file) as f:
+        metadata = json.load(f)
+
+    if speaker_id not in metadata:
+        print(f"Error: {speaker_id} not found in metadata")
+        sys.exit(1)
+
+    old_language = metadata[speaker_id]["language"]
+    metadata[speaker_id]["language"] = log_language
+
+    with open(metadata_file, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    print(f"Updated {speaker_id} language: {old_language} -> {log_language}")
+
+    # Backup transcription.csv before making changes
+    transcription_file = os.path.join(output_dir, "transcription.csv")
+    if os.path.exists(transcription_file):
+        import datetime
+        today = datetime.date.today().strftime("%Y-%m-%d")
+        backup_file = os.path.join(output_dir, f"bk.{today}.transcription.csv")
+        shutil.copy2(transcription_file, backup_file)
+        print(f"Backed up transcription.csv to {os.path.basename(backup_file)}")
+
+    # Step 2: Find segment IDs (1-based row numbers) for this speaker
+    segment_ids = []
+    with open(timeline_file) as f:
+        for i, row in enumerate(csv.DictReader(f), 1):
+            if row["SPEAKER_ID"] == speaker_id:
+                segment_ids.append(i)
+
+    print(f"Retranscribing {len(segment_ids)} segments for {speaker_id}...")
+
+    transcribe_cue = os.path.join(repo_dir, "tools", "transcribe-cue")
+    for segment_id in segment_ids:
+        result = subprocess.run([transcribe_cue, episode_id, str(segment_id)], cwd=repo_dir)
+        if result.returncode != 0:
+            print(f"Error transcribing segment {segment_id}")
+            sys.exit(1)
+
+    # Step 3: Split segments
+    split_segments = os.path.join(repo_dir, "bin", "split-segments")
+    result = subprocess.run([split_segments, episode_id], cwd=repo_dir)
+    if result.returncode != 0:
+        print("Error running split-segments")
+        sys.exit(1)
+
+    # Step 4: Regenerate VTT
+    create_vtt = os.path.join(repo_dir, "bin", "create-vtt")
+    result = subprocess.run([create_vtt, episode_id], cwd=repo_dir)
+    if result.returncode != 0:
+        print("Error running create-vtt")
+        sys.exit(1)
+
+    # Step 5: Copy VTT to Desktop
+    vtt_src = os.path.join(output_dir, f"{episode_id}.vtt")
+    vtt_dst = os.path.expanduser(f"~/Desktop/{episode_id}.vtt")
+    shutil.copy2(vtt_src, vtt_dst)
+    print(f"Copied to {vtt_dst}")
+
+
+if __name__ == "__main__":
+    main()

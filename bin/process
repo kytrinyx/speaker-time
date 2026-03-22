@@ -45,6 +45,7 @@ def main():
         run_script("cut-audio", base_name)
         run_script("detect-language", base_name)
         run_script("transcribe", base_name)
+        run_script("split-segments", base_name)
         run_script("create-vtt", base_name)
 
         # Copy VTT file to Desktop
