@@ -12,11 +12,14 @@ scripts_dir = os.path.dirname(os.path.abspath(__file__))
 repo_dir = os.path.dirname(scripts_dir)
 
 sys.path.insert(0, repo_dir)
+import anthropic
+
 from halfhalf.transcript import Transcript
-from halfhalf.prompts import build_prompts
+from halfhalf.prompts import build_prompts, cohost_for
 from halfhalf.transcriber import Transcriber
 from halfhalf.words import Words
 from halfhalf.segment_splitter import Word, TranscriptionSegment, HybridSplit
+from halfhalf.llm_corrections import generate_corrections, get_intro_rows, get_outro_rows
 
 
 def main():
@@ -94,6 +97,21 @@ def main():
             words_csv.upsert_segment(segment_id, new_words, languages)
             words_csv.save()
             print(f"Updated words.csv ({len(new_words)} word rows for segment {segment_id:06d})")
+
+    corrections_path = transcript.corrections_path
+    retranscribed_ids = {seg_id for seg_id, *_ in segments}
+    all_segments = [row for row in Transcript.load(base_name) if row["text"].strip()]
+    intro_outro_ids = {int(r["segment_id"]) for r in get_intro_rows(all_segments) + get_outro_rows(all_segments)}
+    needs_corrections = not os.path.exists(corrections_path) or bool(retranscribed_ids & intro_outro_ids)
+    if needs_corrections:
+        if os.path.exists(corrections_path):
+            os.remove(corrections_path)
+        corrections_path, corrections = generate_corrections(base_name, cohost_for(base_name), anthropic.Anthropic())
+        with open(corrections_path, "w") as f:
+            json.dump(corrections, f, ensure_ascii=False, indent=2)
+        print(f"Wrote {len(corrections)} intro/outro corrections to {os.path.basename(corrections_path)}")
+    else:
+        print("No intro/outro segments changed, skipping corrections.")
 
     cache_file = os.path.join(output_dir, "split_segments.json")
     cache = {}

@@ -29,6 +29,10 @@ class Transcript:
                 t._intro_outro_corrections = {int(k): v for k, v in json.load(f).items()}
         return t
 
+    @property
+    def corrections_path(self):
+        return self._corrections_path
+
     def contains(self, segment_id, language):
         return (segment_id, language) in self._rows
 

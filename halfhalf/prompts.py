@@ -6,6 +6,11 @@ COHOSTS = {
 }
 
 
+def cohost_for(basename):
+    prefix = basename.split('-ep-')[0] if '-ep-' in basename else 'jeep'
+    return COHOSTS.get(prefix, 'Jeep')
+
+
 def build_prompts(base_name):
     prefix = base_name.split('-ep-')[0] if '-ep-' in base_name else 'jeep'
     cohost = COHOSTS.get(prefix, 'Jeep')

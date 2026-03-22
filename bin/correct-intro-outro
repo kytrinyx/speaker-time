@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import json
+
+import anthropic
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from halfhalf.prompts import cohost_for
+from halfhalf.llm_corrections import generate_corrections
+
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: correct-intro-outro <basename>")
+        sys.exit(1)
+
+    basename = sys.argv[1]
+
+    from halfhalf.transcript import Transcript
+    corrections_path = Transcript(basename).corrections_path
+    if os.path.exists(corrections_path):
+        print(f"Corrections already exist at {corrections_path}, skipping.")
+        return
+
+    cohost = cohost_for(basename)
+    client = anthropic.Anthropic()
+
+    corrections_path, corrections = generate_corrections(basename, cohost, client)
+
+    with open(corrections_path, "w") as f:
+        json.dump(corrections, f, ensure_ascii=False, indent=2)
+    print(f"Wrote {len(corrections)} corrections to {corrections_path}")
+
+
+if __name__ == "__main__":
+    main()
