@@ -1,4 +1,5 @@
 import csv
+import json
 import os
 
 from .corrections import apply as apply_corrections
@@ -10,7 +11,9 @@ class Transcript:
     def __init__(self, basename):
         self.basename = basename
         self.path = os.path.join("output", basename, "transcription.csv")
+        self._corrections_path = os.path.join("output", basename, "intro_outro_corrections.json")
         self._rows = {}  # {(segment_id, language): row}
+        self._intro_outro_corrections = {}  # {segment_id: corrected_text}
 
     @classmethod
     def load(cls, basename):
@@ -21,6 +24,9 @@ class Transcript:
             for row in csv.DictReader(f):
                 key = (int(row['segment_id']), row['language'])
                 t._rows[key] = row
+        if os.path.exists(t._corrections_path):
+            with open(t._corrections_path) as f:
+                t._intro_outro_corrections = {int(k): v for k, v in json.load(f).items()}
         return t
 
     def contains(self, segment_id, language):
@@ -54,4 +60,6 @@ class Transcript:
         for segment_id in sorted(by_segment):
             row = dict(by_segment[segment_id])
             row['text'] = apply_corrections(row['text'])
+            if segment_id in self._intro_outro_corrections:
+                row['text'] = self._intro_outro_corrections[segment_id]
             yield row
