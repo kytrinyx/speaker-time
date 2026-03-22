@@ -107,6 +107,7 @@ def main():
                         'start_time': round(start_time + word_info['start'], 3),
                         'end_time': round(start_time + word_info['end'], 3),
                         'probability': round(word_info.get('probability', 0.0), 4),
+                        'language': language,
                     })
                     word_index += 1
 
@@ -161,12 +162,13 @@ def main():
         f.write(f"  after:  {after_text}\n")
 
     # Upsert words.csv
-    words_fieldnames = ['segment_id', 'word_index', 'word', 'start_time', 'end_time', 'probability']
+    words_fieldnames = ['segment_id', 'language', 'word_index', 'word', 'start_time', 'end_time', 'probability']
     existing_words = []
     if os.path.exists(words_file):
         with open(words_file) as f:
             for row in csv.DictReader(f):
                 if int(row['segment_id']) != segment_id:
+                    row.setdefault('language', '')
                     existing_words.append(row)
 
     with open(words_file, 'w', newline='') as f:

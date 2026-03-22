@@ -63,7 +63,7 @@ def main():
 
     if not os.path.exists(words_file):
         with open(words_file, 'w', newline='') as csvfile:
-            fieldnames = ['segment_id', 'word_index', 'word', 'start_time', 'end_time', 'probability']
+            fieldnames = ['segment_id', 'language', 'word_index', 'word', 'start_time', 'end_time', 'probability']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
 
@@ -121,6 +121,7 @@ def main():
                             'start_time': round(segment_offset + word_info['start'], 3),
                             'end_time': round(segment_offset + word_info['end'], 3),
                             'probability': round(word_info.get('probability', 0.0), 4),
+                            'language': language,
                         })
                         word_index += 1
 
@@ -156,7 +157,7 @@ def main():
             transcript.save()
             if word_rows:
                 with open(words_file, 'a', newline='') as csvfile:
-                    fieldnames = ['segment_id', 'word_index', 'word', 'start_time', 'end_time', 'probability']
+                    fieldnames = ['segment_id', 'language', 'word_index', 'word', 'start_time', 'end_time', 'probability']
                     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     writer.writerows(word_rows)
             transcribed_count += 1
