@@ -59,6 +59,7 @@ output/
     ├── metadata.json               # Speaker stats (from diarize) and language mapping (from detect-language)
     ├── transcription.csv           # Complete transcription data
     ├── words.csv                   # Word-level timestamps from transcription
+    ├── split_segments.json         # Cached cue splits (from split-segments)
     └── sample.vtt                  # WebVTT subtitle file
 ```
 
@@ -89,17 +90,34 @@ Generates language samples and detects speaker languages.
 ### `transcribe`
 Transcribes audio segments with language hints. Captures word-level timestamps alongside segment-level transcription.
 
+For bilingual content, code-switching causes Whisper to produce garbage or silent mistranslations when the audio language doesn't match the hint. After each transcription, if the confidence score is below -1.5 or is 0.0 (indicating a timeout or empty result), the segment is retranscribed with the opposite language hint. Both results are stored in `transcription.csv`; downstream steps use whichever has higher confidence.
+
+An `initial_prompt` is passed to Whisper for each segment to improve transcription of proper nouns (host names, show name). Prompts are episode-specific and built from `lib/prompts.py` based on the basename prefix.
+
 **Usage:**
 ```bash
 ./bin/transcribe <basename>
 ```
 
 **Output:**
-- `transcription.csv` — one row per speaker segment with full text
-- `words.csv` — one row per word with absolute timestamps and probability
+- `transcription.csv` — one or two rows per speaker segment (one per language attempted), best confidence wins downstream
+- `words.csv` — one row per word per language attempt, with absolute timestamps and probability
+
+### `split-segments`
+Applies `HybridSplit` to each transcription segment to produce shorter, more readable cues with accurate per-cue timestamps: first splits at sentence-ending punctuation, then uses a local Ollama model to sub-split any cue still over 80 characters. Results are cached in `split_segments.json`; segments whose source text is unchanged since the last run are skipped.
+
+**Usage:**
+```bash
+./bin/split-segments <basename>
+```
+
+**Output:**
+- `split_segments.json` — cached cue splits keyed by segment ID
+
+**Requires:** Ollama running locally; uses `exaone3.5:latest` by default.
 
 ### `create-vtt`
-Converts transcription CSV to WebVTT subtitle format. When `words.csv` is present, applies `HybridSplit` to produce shorter, more readable cues with accurate per-cue timestamps: first splits at sentence-ending punctuation, then uses a local Ollama model to sub-split any cue still over 80 characters.
+Converts transcription CSV to WebVTT subtitle format. Skips segments that are empty, timed out, filler-only, or have low confidence (below -1.5 or 0.0). Reads pre-computed cue splits from `split_segments.json` (produced by `split-segments`) when available; falls back to one cue per segment otherwise.
 
 **Usage:**
 ```bash
@@ -113,15 +131,14 @@ Converts transcription CSV to WebVTT subtitle format. When `words.csv` is presen
 
 **Output:**
 - Creates `output/sample/sample.vtt`
-- One cue per sentence boundary (or per segment if `words.csv` is absent)
-
-**Requires:** Ollama running locally (for sub-splitting long cues); uses `exaone3.5:latest` by default.
 
 
 ## Tools
 
 ### `transcribe-cue`
 Re-transcribes a single audio segment and patches both `transcription.csv` and `words.csv` in place. Useful when a segment has a bad transcription and you want to fix just that one without rerunning the full transcription step.
+
+Skips the segment if existing confidence is already good (≥ -1.5 and non-zero). Otherwise transcribes with the speaker's assigned language hint; if the result is still low confidence, retranscribes with the opposite language. Both results are stored when the alt language is tried.
 
 **Usage:**
 ```bash
@@ -185,7 +202,7 @@ Ad-hoc scripts go in the `./scripts/` in order to not pollute `./bin`.
 - ffmpeg-python
 
 ### Local Services
-- **Ollama**: Required by `create-vtt` for sub-splitting long cues. Install from [ollama.com](https://ollama.com) and pull the model: `ollama pull exaone3.5:latest`
+- **Ollama**: Required by `split-segments` for sub-splitting long cues. Install from [ollama.com](https://ollama.com) and pull the model: `ollama pull exaone3.5:latest`
 
 ## Setup Instructions
 
@@ -241,7 +258,7 @@ SPEAKER_01,22.80984719864177,24.558573853989813
 ```
 
 ### Metadata JSON (`metadata.json`)
-Written by `diarize` with per-speaker timeline stats, then enriched by `detect-language` with language and confidence.
+Written by `diarize` with per-speaker timeline stats (including `skip: true` for speakers with median segment duration below 0.5s), then enriched by `detect-language` with language and confidence. Speakers with `skip: true` are not processed by `detect-language` and have no language fields. `confidence` is 1.0 when detection confidence was ≥ 0.9, and 0.0 when it fell below that threshold (language will be `"?"`). The raw per-segment confidence values are preserved in `language_detection/*.log.json`.
 
 ```json
 {
@@ -252,26 +269,32 @@ Written by `diarize` with per-speaker timeline stats, then enriched by `detect-l
     "long_segments": 0,
     "longest": 22.9,
     "mean": 3.03,
+    "median": 2.1,
     "stddev": 3.25,
+    "skip": false,
     "language": "ko",
-    "confidence": 0.991
+    "confidence": 1.0
   }
 }
 ```
 ### Transcription CSV (`transcription.csv`)
+Keyed by `(segment_id, language)`. A segment may have two rows when code-switching triggers an alt-language attempt. Downstream steps iterate via `Transcript.__iter__`, which yields the highest-confidence row per segment.
+
 ```csv
 speaker_id,segment_id,start_time,end_time,text,language,confidence
 SPEAKER_00,1,0.008488964346349746,0.534804753820034,,ko,0.0
 SPEAKER_00,2,0.7555178268251275,2.1307300509337863,그쵸 근데,ko,-0.6298892157418388
+SPEAKER_02,974,3301.2,3309.8,I'm raising a daughter. When I go home...,en,-0.8621
+SPEAKER_02,974,3301.2,3309.8,따로 키우고 있어서 집에 가면...,ko,-0.3500
 ```
 
 ### Words CSV (`words.csv`)
-Word-level timestamps with absolute times (offset to match the original audio, not the segment file).
+Word-level timestamps with absolute times (offset to match the original audio, not the segment file). Keyed by `(segment_id, language)` — when both language attempts are stored for a segment, both sets of word rows appear. Downstream steps filter by the winning language.
 
 ```csv
-segment_id,word_index,word,start_time,end_time,probability
-2,0, 그쵸,0.756,1.276,0.8263
-2,1, 근데,1.276,1.516,0.5683
+segment_id,language,word_index,word,start_time,end_time,probability
+2,ko,0, 그쵸,0.756,1.276,0.8263
+2,ko,1, 근데,1.276,1.516,0.5683
 ```
 
 Segments with timeouts or errors produce no rows in this file.
@@ -296,6 +319,7 @@ Segments with timeouts or errors produce no rows in this file.
 ./bin/cut-audio interview
 ./bin/detect-language interview
 ./bin/transcribe interview
+./bin/split-segments interview
 ./bin/create-vtt interview
 
 ```
@@ -306,5 +330,5 @@ Segments with timeouts or errors produce no rows in this file.
 - Language detection improves transcription accuracy for multilingual content
 - Pipeline scripts handle re-runs by skipping completed steps: `diarize` skips if timeline.csv exists, `cut-audio` and `transcribe` resume where they left off
 - Speaker diarization cannot guarantee same speaker id on multiple runs; if script crashes during diarization it will have to restart from scratch
-- VTT files exclude empty segments and timeout markers for clean subtitle output
-- `create-vtt` produces multiple cues per segment when `words.csv` is present; falls back to one cue per segment otherwise
+- VTT files exclude empty segments, timeout markers, filler-only segments, and low-confidence segments (confidence below -1.5 or 0.0)
+- `split-segments` produces multiple cues per segment (requires Ollama); `create-vtt` uses the cached splits when available, falling back to one cue per segment otherwise
