@@ -4,11 +4,11 @@ import sys
 import os
 import csv
 import json
-import whisper
-import torch
-import signal
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lib.transcript import Transcript
+from lib.prompts import build_prompts
+from lib.transcriber import Transcriber
+
 
 def main():
     if len(sys.argv) != 2:
@@ -16,6 +16,7 @@ def main():
         sys.exit(1)
 
     base_name = sys.argv[1]
+    prompts = build_prompts(base_name)
 
     output_dir = os.path.join("output", base_name)
     timeline_file = os.path.join(output_dir, "timeline.csv")
@@ -35,10 +36,7 @@ def main():
 
     print("Transcribing audio segments...")
 
-    # Load Whisper model with GPU detection
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    use_fp16 = device == "cuda"
-    model = whisper.load_model("small", device=device)
+    transcriber = Transcriber(prompts)
 
     # Load metadata for language hints and skip flags
     speaker_languages = {}
@@ -85,149 +83,27 @@ def main():
             print(f"Warning: Audio segment {segment_file} not found")
             continue
 
-        transcription_row = None
-        word_rows = []
-
+        print(f"Transcribing segment {i:06d} ({speaker_id})...")
         try:
-            def timeout_handler(signum, frame):
-                raise TimeoutError("Transcription timeout")
-
-            # Set timeout for individual segment (30 seconds per segment)
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(30)
-
-            try:
-                result = model.transcribe(segment_file, language=language, fp16=use_fp16, word_timestamps=True)
-                signal.alarm(0)  # Cancel timeout
-
-                transcription_row = {
-                    'speaker_id': speaker_id,
-                    'segment_id': i,
-                    'start_time': timeline_row['start_time'],
-                    'end_time': timeline_row['end_time'],
-                    'text': result['text'].strip(),
-                    'language': language,
-                    'confidence': float(result.get('segments', [{}])[0].get('avg_logprob', 0.0)) if result.get('segments') else 0.0
-                }
-
-                segment_offset = float(timeline_row['start_time'])
-                word_index = 0
-                for whisper_segment in result.get('segments', []):
-                    for word_info in whisper_segment.get('words', []):
-                        word_rows.append({
-                            'segment_id': i,
-                            'word_index': word_index,
-                            'word': word_info['word'],
-                            'start_time': round(segment_offset + word_info['start'], 3),
-                            'end_time': round(segment_offset + word_info['end'], 3),
-                            'probability': round(word_info.get('probability', 0.0), 4),
-                            'language': language,
-                        })
-                        word_index += 1
-
-                print(f"Transcribed segment {i:06d} ({speaker_id}): {result['text'].strip()[:50]}...")
-
-            except TimeoutError:
-                signal.alarm(0)  # Cancel timeout
-                print(f"Timeout transcribing segment {i:06d} (30s limit exceeded)")
-                transcription_row = {
-                    'speaker_id': speaker_id,
-                    'segment_id': i,
-                    'start_time': timeline_row['start_time'],
-                    'end_time': timeline_row['end_time'],
-                    'text': "[TIMEOUT]",
-                    'language': language,
-                    'confidence': 0.0
-                }
-
+            rows, words = transcriber.transcribe_segment(
+                segment_file, i, speaker_id, language,
+                timeline_row['start_time'], timeline_row['end_time'],
+            )
         except Exception as e:
             print(f"Error transcribing segment {i:06d}: {e}")
-            transcription_row = {
-                'speaker_id': speaker_id,
-                'segment_id': i,
-                'start_time': timeline_row['start_time'],
-                'end_time': timeline_row['end_time'],
-                'text': "",
-                'language': language,
-                'confidence': 0.0
-            }
+            continue
 
-        if transcription_row:
-            transcript.upsert(transcription_row)
-            all_word_rows = list(word_rows)
+        for row in rows:
+            transcript.upsert(row)
+        transcript.save()
 
-            primary_confidence = float(transcription_row['confidence'])
-            if primary_confidence < -1.5 or primary_confidence == 0.0:
-                alt_language = 'ko' if language == 'en' else 'en'
-                print(f"  Low confidence ({primary_confidence:.4f}), trying alt language ({alt_language})...")
-                alt_transcription_row = None
-                alt_word_rows = []
+        if words:
+            with open(words_file, 'a', newline='') as csvfile:
+                fieldnames = ['segment_id', 'language', 'word_index', 'word', 'start_time', 'end_time', 'probability']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writerows(words)
 
-                try:
-                    def timeout_handler(signum, frame):
-                        raise TimeoutError("Transcription timeout")
-                    signal.signal(signal.SIGALRM, timeout_handler)
-                    signal.alarm(30)
-
-                    try:
-                        alt_result = model.transcribe(segment_file, language=alt_language, fp16=use_fp16, word_timestamps=True)
-                        signal.alarm(0)
-
-                        alt_confidence = float(alt_result.get('segments', [{}])[0].get('avg_logprob', 0.0)) if alt_result.get('segments') else 0.0
-                        alt_transcription_row = {
-                            'speaker_id': speaker_id,
-                            'segment_id': i,
-                            'start_time': timeline_row['start_time'],
-                            'end_time': timeline_row['end_time'],
-                            'text': alt_result['text'].strip(),
-                            'language': alt_language,
-                            'confidence': alt_confidence,
-                        }
-
-                        segment_offset = float(timeline_row['start_time'])
-                        word_index = 0
-                        for whisper_segment in alt_result.get('segments', []):
-                            for word_info in whisper_segment.get('words', []):
-                                alt_word_rows.append({
-                                    'segment_id': i,
-                                    'word_index': word_index,
-                                    'word': word_info['word'],
-                                    'start_time': round(segment_offset + word_info['start'], 3),
-                                    'end_time': round(segment_offset + word_info['end'], 3),
-                                    'probability': round(word_info.get('probability', 0.0), 4),
-                                    'language': alt_language,
-                                })
-                                word_index += 1
-
-                        print(f"  [{alt_language}] {alt_result['text'].strip()[:50]}... (confidence: {alt_confidence:.4f})")
-
-                    except TimeoutError:
-                        signal.alarm(0)
-                        print(f"  [{alt_language}] Timeout (30s limit exceeded)")
-                        alt_transcription_row = {
-                            'speaker_id': speaker_id,
-                            'segment_id': i,
-                            'start_time': timeline_row['start_time'],
-                            'end_time': timeline_row['end_time'],
-                            'text': "[TIMEOUT]",
-                            'language': alt_language,
-                            'confidence': 0.0,
-                        }
-
-                except Exception as e:
-                    print(f"  Error on alt transcription for segment {i:06d}: {e}")
-
-                if alt_transcription_row:
-                    transcript.upsert(alt_transcription_row)
-                    all_word_rows += alt_word_rows
-
-            transcript.save()
-            if all_word_rows:
-                with open(words_file, 'a', newline='') as csvfile:
-                    fieldnames = ['segment_id', 'language', 'word_index', 'word', 'start_time', 'end_time', 'probability']
-                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                    writer.writerows(all_word_rows)
-            transcribed_count += 1
+        transcribed_count += 1
 
     print(f"Transcription saved to: {transcription_file}")
     print(f"Transcribed {transcribed_count} new segments")

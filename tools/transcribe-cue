@@ -4,13 +4,13 @@ import sys
 import os
 import csv
 import json
-import whisper
-import torch
-import signal
 import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
 from transcript import Transcript
+from prompts import build_prompts
+from transcriber import Transcriber
+
 
 
 def main():
@@ -20,6 +20,7 @@ def main():
 
     base_name = sys.argv[1]
     segment_id = int(sys.argv[2])
+    prompts = build_prompts(base_name)
 
     output_dir = os.path.join("output", base_name)
     timeline_file = os.path.join(output_dir, "timeline.csv")
@@ -78,84 +79,12 @@ def main():
 
     print(f"Retranscribing segment {segment_id:06d} ({speaker_id}, {language})...")
 
-    # Load Whisper model
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    use_fp16 = device == "cuda"
-    model = whisper.load_model("small", device=device)
-
-    def transcribe_segment(lang):
-        try:
-            def timeout_handler(signum, frame):
-                raise TimeoutError("Transcription timeout")
-
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(30)
-
-            try:
-                result = model.transcribe(audio_file, language=lang, fp16=use_fp16, word_timestamps=True)
-                signal.alarm(0)
-
-                confidence = float(result.get('segments', [{}])[0].get('avg_logprob', 0.0)) if result.get('segments') else 0.0
-                row = {
-                    'speaker_id': speaker_id,
-                    'segment_id': segment_id,
-                    'start_time': start_time,
-                    'end_time': end_time,
-                    'text': result['text'].strip(),
-                    'language': lang,
-                    'confidence': confidence,
-                }
-
-                words = []
-                word_index = 0
-                for whisper_segment in result.get('segments', []):
-                    for word_info in whisper_segment.get('words', []):
-                        words.append({
-                            'segment_id': segment_id,
-                            'word_index': word_index,
-                            'word': word_info['word'],
-                            'start_time': round(start_time + word_info['start'], 3),
-                            'end_time': round(start_time + word_info['end'], 3),
-                            'probability': round(word_info.get('probability', 0.0), 4),
-                            'language': lang,
-                        })
-                        word_index += 1
-
-                print(f"  [{lang}] {result['text'].strip()[:80]} (confidence: {confidence:.4f})")
-                return row, words
-
-            except TimeoutError:
-                signal.alarm(0)
-                print(f"  [{lang}] Timeout (30s limit exceeded)")
-                row = {
-                    'speaker_id': speaker_id,
-                    'segment_id': segment_id,
-                    'start_time': start_time,
-                    'end_time': end_time,
-                    'text': "[TIMEOUT]",
-                    'language': lang,
-                    'confidence': 0.0,
-                }
-                return row, []
-
-        except Exception as e:
-            print(f"Error transcribing segment {segment_id:06d} ({lang}): {e}")
-            sys.exit(1)
-
     before_text = next((row['text'] for row in transcript if int(row['segment_id']) == segment_id), None)
 
-    primary_row, primary_words = transcribe_segment(language)
-    primary_confidence = float(primary_row['confidence'])
-
-    all_rows = [primary_row]
-    all_words = primary_words
-
-    if primary_confidence < -1.5 or primary_confidence == 0.0:
-        alt_language = 'ko' if language == 'en' else 'en'
-        print(f"  Low confidence ({primary_confidence:.4f}), trying alt language ({alt_language})...")
-        alt_row, alt_words = transcribe_segment(alt_language)
-        all_rows.append(alt_row)
-        all_words += alt_words
+    transcriber = Transcriber(prompts)
+    all_rows, all_words = transcriber.transcribe_segment(
+        audio_file, segment_id, speaker_id, language, start_time, end_time
+    )
 
     for row in all_rows:
         transcript.upsert(row)
