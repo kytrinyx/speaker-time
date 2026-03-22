@@ -28,10 +28,11 @@ def main():
     output_dir = os.path.join(repo_dir, "output", base_name)
     timeline_file = os.path.join(output_dir, "timeline.csv")
     metadata_file = os.path.join(output_dir, "metadata.json")
-    transcription_file = os.path.join(output_dir, "transcription.csv")
     words_file = os.path.join(output_dir, "words.csv")
 
-    for path in [timeline_file, transcription_file]:
+    transcript = Transcript.load(base_name)
+
+    for path in [timeline_file, transcript.path]:
         if not os.path.exists(path):
             print(f"Error: {path} not found")
             sys.exit(1)
@@ -40,8 +41,6 @@ def main():
     if os.path.exists(metadata_file):
         with open(metadata_file) as f:
             metadata = json.load(f)
-
-    transcript = Transcript.load(transcription_file)
 
     # Find all segments that need transcription
     segments = []  # list of (segment_id, speaker_id, language, start_time, end_time, audio_file)
@@ -61,7 +60,7 @@ def main():
 
         today = datetime.date.today().strftime("%Y-%m-%d")
         backup_file = os.path.join(output_dir, f"bk.{today}.transcription.csv")
-        shutil.copy2(transcription_file, backup_file)
+        shutil.copy2(transcript.path, backup_file)
         print(f"Backed up transcription.csv to {os.path.basename(backup_file)}")
 
         if os.path.exists(words_file):

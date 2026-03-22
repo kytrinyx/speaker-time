@@ -17,7 +17,6 @@ def main():
 
     basename = sys.argv[1]
 
-    transcription_file = os.path.join("output", basename, "transcription.csv")
     words_file = os.path.join("output", basename, "words.csv")
     cache_file = os.path.join("output", basename, "split_segments.json")
 
@@ -41,7 +40,7 @@ def main():
                 Word(row["word"], float(row["start_time"]), float(row["end_time"]))
             )
 
-    transcript = Transcript.load(transcription_file)
+    transcript = Transcript.load(basename)
     segments = []
     for row in transcript:
         text = row["text"].strip()

@@ -21,7 +21,7 @@ if not os.path.exists(os.path.join(output_dir, "timeline.csv")):
     print(f"Error: {output_dir}/timeline.csv not found")
     sys.exit(1)
 
-transcript = Transcript.load(os.path.join(output_dir, "transcription.csv"))
+transcript = Transcript.load(episode_id)
 segments = [row for row in transcript if row["text"].strip()]
 
 # Intro: first 50 Korean segments

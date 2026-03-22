@@ -32,7 +32,6 @@ def main():
 
     basename = sys.argv[1]
 
-    transcription_file = os.path.join("output", basename, "transcription.csv")
     cache_file = os.path.join("output", basename, "split_segments.json")
     vtt_file = os.path.join("output", basename, f"{basename}.vtt")
 
@@ -42,7 +41,7 @@ def main():
         with open(cache_file) as f:
             split_cache = json.load(f)
 
-    transcript = Transcript.load(transcription_file)
+    transcript = Transcript.load(basename)
     cues = []
     segment_count = 0
     for row in transcript:

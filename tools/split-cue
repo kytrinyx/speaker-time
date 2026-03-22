@@ -30,15 +30,14 @@ def main():
     segment_id = int(args[1])
     dry_run = "--dry-run" in flags
 
-    transcription_file = os.path.join("output", basename, "transcription.csv")
     words_file = os.path.join("output", basename, "words.csv")
     cache_file = os.path.join("output", basename, "split_segments.json")
 
-    transcript = Transcript.load(transcription_file)
+    transcript = Transcript.load(basename)
     row = next((r for r in transcript if int(r["segment_id"]) == segment_id), None)
 
     if row is None:
-        print(f"Error: segment {segment_id} not found in {transcription_file}")
+        print(f"Error: segment {segment_id} not found in {transcript.path}")
         sys.exit(1)
 
     text = row["text"].strip()

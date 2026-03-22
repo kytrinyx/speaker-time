@@ -26,14 +26,15 @@ def main():
     output_dir = os.path.join("output", base_name)
     timeline_file = os.path.join(output_dir, "timeline.csv")
     metadata_file = os.path.join(output_dir, "metadata.json")
-    transcription_file = os.path.join(output_dir, "transcription.csv")
     words_file = os.path.join(output_dir, "words.csv")
     audio_file = os.path.join(output_dir, "audio", f"{segment_id:06d}.mp3")
 
     os.makedirs("logs", exist_ok=True)
     log_file = os.path.join("logs", f"transcribe-cue.{base_name}.log")
 
-    for path in [timeline_file, transcription_file, audio_file]:
+    transcript = Transcript.load(base_name)
+
+    for path in [timeline_file, transcript.path, audio_file]:
         if not os.path.exists(path):
             print(f"Error: {path} not found")
             sys.exit(1)
@@ -70,8 +71,6 @@ def main():
             metadata = json.load(f)
             speaker_data = metadata.get(speaker_id, {})
             language = speaker_data.get("language", "en")
-
-    transcript = Transcript.load(transcription_file)
 
     if not transcript.needs_transcription(segment_id, language):
         existing_confidence = float(transcript._rows[(segment_id, language)]['confidence'])

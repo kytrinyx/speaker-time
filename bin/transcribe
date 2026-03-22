@@ -56,9 +56,8 @@ def main():
         for row in reader:
             timeline_data.append(row)
 
-    transcription_file = os.path.join(output_dir, "transcription.csv")
     words_file = os.path.join(output_dir, "words.csv")
-    transcript = Transcript.load(transcription_file)
+    transcript = Transcript.load(base_name)
     words_csv = Words.load(words_file)
 
     # Transcribe each audio segment
@@ -99,7 +98,7 @@ def main():
 
         transcribed_count += 1
 
-    print(f"Transcription saved to: {transcription_file}")
+    print(f"Transcription saved to: {transcript.path}")
     print(f"Transcribed {transcribed_count} new segments")
 
 if __name__ == "__main__":

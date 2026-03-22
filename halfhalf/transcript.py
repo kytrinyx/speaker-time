@@ -7,16 +7,17 @@ FIELDNAMES = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'lan
 
 
 class Transcript:
-    def __init__(self, path):
-        self.path = path
+    def __init__(self, basename):
+        self.basename = basename
+        self.path = os.path.join("output", basename, "transcription.csv")
         self._rows = {}  # {(segment_id, language): row}
 
     @classmethod
-    def load(cls, path):
-        t = cls(path)
-        if not os.path.exists(path):
+    def load(cls, basename):
+        t = cls(basename)
+        if not os.path.exists(t.path):
             return t
-        with open(path, newline='') as f:
+        with open(t.path, newline='') as f:
             for row in csv.DictReader(f):
                 key = (int(row['segment_id']), row['language'])
                 t._rows[key] = row
