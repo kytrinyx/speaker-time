@@ -9,6 +9,9 @@ import torch
 import signal
 import datetime
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
+from transcript import Transcript
+
 
 def main():
     if len(sys.argv) != 3:
@@ -130,27 +133,10 @@ def main():
         print(f"Error transcribing segment {segment_id:06d}: {e}")
         sys.exit(1)
 
-    # Replace matching row in transcription.csv
-    transcription_fieldnames = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
-    rows = []
-    replaced = False
-    before_text = None
-    with open(transcription_file) as f:
-        for row in csv.DictReader(f):
-            if int(row['segment_id']) == segment_id:
-                before_text = row.get('text', '')
-                rows.append(transcription_row)
-                replaced = True
-            else:
-                rows.append(row)
-
-    if not replaced:
-        rows.append(transcription_row)
-
-    with open(transcription_file, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=transcription_fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
+    transcript = Transcript.load(transcription_file)
+    before_text = next((row['text'] for row in transcript if int(row['segment_id']) == segment_id), None)
+    transcript.upsert(transcription_row)
+    transcript.save()
 
     print(f"Updated transcription.csv")
 
