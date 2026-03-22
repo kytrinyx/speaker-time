@@ -5,10 +5,10 @@ import os
 import csv
 import json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib.transcript import Transcript
-from lib.prompts import build_prompts
-from lib.transcriber import Transcriber
-from lib.words import Words
+from halfhalf.transcript import Transcript
+from halfhalf.prompts import build_prompts
+from halfhalf.transcriber import Transcriber
+from halfhalf.words import Words
 
 
 def main():

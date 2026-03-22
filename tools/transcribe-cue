@@ -6,11 +6,11 @@ import csv
 import json
 import datetime
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from transcript import Transcript
-from prompts import build_prompts
-from transcriber import Transcriber
-from words import Words
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from halfhalf.transcript import Transcript
+from halfhalf.prompts import build_prompts
+from halfhalf.transcriber import Transcriber
+from halfhalf.words import Words
 
 
 

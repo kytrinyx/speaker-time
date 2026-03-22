@@ -1,7 +1,7 @@
 import csv
 import os
 
-from corrections import apply as apply_corrections
+from .corrections import apply as apply_corrections
 
 FIELDNAMES = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
 

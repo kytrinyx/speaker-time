@@ -5,9 +5,9 @@ import os
 import csv
 import json
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from segment_splitter import Word, TranscriptionSegment, HybridSplit
-from transcript import Transcript
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from halfhalf.segment_splitter import Word, TranscriptionSegment, HybridSplit
+from halfhalf.transcript import Transcript
 
 
 def format_timestamp(seconds):

@@ -11,12 +11,12 @@ import datetime
 scripts_dir = os.path.dirname(os.path.abspath(__file__))
 repo_dir = os.path.dirname(scripts_dir)
 
-sys.path.insert(0, os.path.join(repo_dir, 'lib'))
-from transcript import Transcript
-from prompts import build_prompts
-from transcriber import Transcriber
-from words import Words
-from segment_splitter import Word, TranscriptionSegment, HybridSplit
+sys.path.insert(0, repo_dir)
+from halfhalf.transcript import Transcript
+from halfhalf.prompts import build_prompts
+from halfhalf.transcriber import Transcriber
+from halfhalf.words import Words
+from halfhalf.segment_splitter import Word, TranscriptionSegment, HybridSplit
 
 
 def main():

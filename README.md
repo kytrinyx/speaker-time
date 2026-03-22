@@ -92,7 +92,7 @@ Transcribes audio segments with language hints. Captures word-level timestamps a
 
 For bilingual content, code-switching causes Whisper to produce garbage or silent mistranslations when the audio language doesn't match the hint. After each transcription, if the confidence score is below -1.5 or is 0.0 (indicating a timeout or empty result), the segment is retranscribed with the opposite language hint. Both results are stored in `transcription.csv`; downstream steps use whichever has higher confidence.
 
-An `initial_prompt` is passed to Whisper for each segment to improve transcription of proper nouns (host names, show name). Prompts are episode-specific and built from `lib/prompts.py` based on the basename prefix.
+An `initial_prompt` is passed to Whisper for each segment to improve transcription of proper nouns (host names, show name). Prompts are episode-specific and built from `halfhalf/prompts.py` based on the basename prefix.
 
 **Usage:**
 ```bash

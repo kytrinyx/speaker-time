@@ -4,9 +4,9 @@ import sys
 import os
 import json
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
-from timeline import Timeline
-from language_detector import SerialLanguageDetector, ConcatenatingLanguageDetector
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from halfhalf.timeline import Timeline
+from halfhalf.language_detector import SerialLanguageDetector, ConcatenatingLanguageDetector
 
 import whisper
 

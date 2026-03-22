@@ -4,8 +4,8 @@ import os
 import sys
 
 repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(repo_dir, "lib"))
-from transcript import Transcript
+sys.path.insert(0, repo_dir)
+from halfhalf.transcript import Transcript
 
 INTRO_KO_LINES = 5
 OUTRO_LINES = 15
