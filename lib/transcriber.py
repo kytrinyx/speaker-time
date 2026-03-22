@@ -24,7 +24,7 @@ class Transcriber:
         rows = [primary_row]
         words = list(primary_words)
 
-        if float(primary_row['confidence']) < -1.5 or float(primary_row['confidence']) == 0.0:
+        if float(primary_row['confidence']) < -1.5:
             alt_language = 'ko' if language == 'en' else 'en'
             print(f"  Low confidence ({float(primary_row['confidence']):.4f}), trying alt language ({alt_language})...")
             alt_row, alt_words = self._transcribe_one(

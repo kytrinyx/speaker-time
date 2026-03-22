@@ -19,6 +19,11 @@ class TranscriptionSegment:
     language: str
     words: list = field(default_factory=list)
 
+    def is_filler(self):
+        if self.language == "ko":
+            return bool(re.fullmatch(r'[ㅋㅎ아어고으\s]+', self.text))
+        return bool(re.fullmatch(r'[hH][aAeE]+([hH][aAeE]*)*[\s!.]*', self.text))
+
 
 @dataclass
 class Cue:

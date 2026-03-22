@@ -4,17 +4,10 @@ import sys
 import os
 import csv
 import json
-import re
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lib'))
 from segment_splitter import Word, TranscriptionSegment, HybridSplit
 from transcript import Transcript
-
-
-def is_filler(text, lang):
-    if lang == "ko":
-        return bool(re.fullmatch(r'[ㅋㅎ아어고으\s]+', text))
-    return bool(re.fullmatch(r'[hH][aAeE]+([hH][aAeE]*)*[\s!.]*', text))
 
 
 def main():
@@ -53,19 +46,21 @@ def main():
     for row in transcript:
         text = row["text"].strip()
         lang = row.get("language", "")
-        if not text or text == "[TIMEOUT]" or is_filler(text, lang):
+        if not text or text == "[TIMEOUT]":
             continue
         sid = int(row["segment_id"])
         if (sid, lang) not in words_by_segment:
             continue
-        segments.append(TranscriptionSegment(
+        seg = TranscriptionSegment(
             id=sid,
             start=float(row["start_time"]),
             end=float(row["end_time"]),
             text=text,
             language=lang,
             words=words_by_segment[(sid, lang)],
-        ))
+        )
+        if not seg.is_filler():
+            segments.append(seg)
 
     splitter = HybridSplit()
     split_count = 0

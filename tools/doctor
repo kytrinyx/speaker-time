@@ -16,6 +16,7 @@ from transcript import Transcript
 from prompts import build_prompts
 from transcriber import Transcriber
 from words import Words
+from segment_splitter import Word, TranscriptionSegment, HybridSplit
 
 
 def main():
@@ -96,11 +97,59 @@ def main():
         words_csv.save()
         print(f"Updated words.csv ({len(new_words)} word rows for segment {segment_id:06d})")
 
-    split_segments = os.path.join(repo_dir, "bin", "split-segments")
-    result = subprocess.run([split_segments, base_name], cwd=repo_dir)
-    if result.returncode != 0:
-        print("Error running split-segments")
-        sys.exit(1)
+    cache_file = os.path.join(output_dir, "split_segments.json")
+    cache = {}
+    if os.path.exists(cache_file):
+        with open(cache_file) as f:
+            cache = json.load(f)
+
+    words_by_segment = {}
+    if os.path.exists(words_file):
+        with open(words_file) as f:
+            for row in csv.DictReader(f):
+                sid = int(row["segment_id"])
+                lang = row.get("language", "")
+                words_by_segment.setdefault((sid, lang), []).append(
+                    Word(row["word"], float(row["start_time"]), float(row["end_time"]))
+                )
+
+    splitter = HybridSplit()
+    split_count = 0
+    skip_count = 0
+
+    for row in transcript:
+        text = row["text"].strip()
+        lang = row.get("language", "")
+        if not text or text == "[TIMEOUT]":
+            continue
+        sid = int(row["segment_id"])
+        if (sid, lang) not in words_by_segment:
+            continue
+        seg = TranscriptionSegment(
+            id=sid,
+            start=float(row["start_time"]),
+            end=float(row["end_time"]),
+            text=text,
+            language=lang,
+            words=words_by_segment[(sid, lang)],
+        )
+        if seg.is_filler():
+            continue
+        key = str(sid)
+        if key in cache and cache[key]["source"] == text:
+            skip_count += 1
+            continue
+        cues = splitter.split(seg)
+        cache[key] = {
+            "source": text,
+            "cues": [{"text": c.text, "start": c.start, "end": c.end} for c in cues],
+        }
+        split_count += 1
+
+    with open(cache_file, "w") as f:
+        json.dump(cache, f, ensure_ascii=False, indent=2)
+
+    print(f"Split {split_count} segments, skipped {skip_count} unchanged")
 
     create_vtt = os.path.join(repo_dir, "bin", "create-vtt")
     result = subprocess.run([create_vtt, base_name], cwd=repo_dir)

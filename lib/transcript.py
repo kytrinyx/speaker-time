@@ -27,8 +27,7 @@ class Transcript:
         row = self._rows.get((segment_id, language))
         if row is None:
             return True
-        confidence = float(row['confidence'])
-        return confidence == 0.0 or confidence < -1.5
+        return float(row['confidence']) < -1.5
 
     def low_confidence(self, segment_id, language):
         return self.needs_transcription(segment_id, language)
