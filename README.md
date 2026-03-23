@@ -56,7 +56,7 @@ output/
     ├── language_detection/          # Language detection samples
     │   ├── SPEAKER_00_language_sample.mp3
     │   └── SPEAKER_01_language_sample.mp3
-    ├── metadata.json               # Speaker stats (from diarize) and language mapping (from detect-language)
+    ├── metadata.json               # Video info (from download), speaker stats (from diarize), and language mapping (from detect-language)
     ├── transcription.csv           # Complete transcription data
     ├── words.csv                   # Word-level timestamps from transcription
     ├── split_segments.json         # Cached cue splits (from split-segments)
@@ -64,7 +64,7 @@ output/
 ```
 
 ### `diarize`
-Performs speaker diarization, generates timeline CSV, and writes initial per-speaker stats to `metadata.json`.
+Performs speaker diarization, generates timeline CSV, and adds per-speaker stats to `metadata.json`.
 
 **Usage:**
 ```bash
@@ -258,10 +258,12 @@ SPEAKER_01,22.80984719864177,24.558573853989813
 ```
 
 ### Metadata JSON (`metadata.json`)
-Written by `diarize` with per-speaker timeline stats (including `skip: true` for speakers with median segment duration below 0.5s), then enriched by `detect-language` with language and confidence. Speakers with `skip: true` are not processed by `detect-language` and have no language fields. `confidence` is 1.0 when detection confidence was ≥ 0.9, and 0.0 when it fell below that threshold (language will be `"?"`). The raw per-segment confidence values are preserved in `language_detection/*.log.json`.
+Initialized by `download` with `youtube_video_id` and `title`. Then written by `diarize` with per-speaker timeline stats (including `skip: true` for speakers with median segment duration below 0.5s), then enriched by `detect-language` with language and confidence. Speakers with `skip: true` are not processed by `detect-language` and have no language fields. `confidence` is 1.0 when detection confidence was ≥ 0.9, and 0.0 when it fell below that threshold (language will be `"?"`). The raw per-segment confidence values are preserved in `language_detection/*.log.json`.
 
 ```json
 {
+  "youtube_video_id": "0rlG4kVKZ3E",
+  "title": "Half & Half Episode 1",
   "SPEAKER_00": {
     "airtime_seconds": 1403.616,
     "airtime_pct": 54.56,

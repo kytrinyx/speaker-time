@@ -3,7 +3,9 @@
 import sys
 import os
 import glob
+import json
 import subprocess
+from urllib.parse import urlparse, parse_qs
 
 def main():
     if len(sys.argv) != 3:
@@ -29,8 +31,35 @@ def main():
     number = len(glob.glob(pattern)) + 1
     basename = f"{cohost}-ep-{number:03d}"
 
+    parsed = urlparse(url)
+    if parsed.hostname in ("youtu.be",):
+        video_id = parsed.path.lstrip("/")
+    else:
+        video_id = parse_qs(parsed.query).get("v", [None])[0]
+
     audio_dir = os.path.join(project_root, "audio")
     os.makedirs(audio_dir, exist_ok=True)
+
+    output_dir = os.path.join(project_root, "output", basename)
+    os.makedirs(output_dir, exist_ok=True)
+
+    title_result = subprocess.run(
+        ["yt-dlp", "--print", "title", url],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    title = title_result.stdout.strip()
+
+    metadata = {}
+    if video_id:
+        metadata["youtube_video_id"] = video_id
+    if title:
+        metadata["title"] = title
+    if metadata:
+        metadata_file = os.path.join(output_dir, "metadata.json")
+        with open(metadata_file, "w") as f:
+            json.dump(metadata, f, indent=2)
 
     mp3_path = os.path.join(audio_dir, f"{basename}.mp3")
     if os.path.exists(mp3_path):

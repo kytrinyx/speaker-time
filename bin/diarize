@@ -84,7 +84,12 @@ def main():
     distribution = timeline.airtime_distribution()
     speakers = sorted(distribution)
 
+    metadata_file = os.path.join(output_dir, "metadata.json")
     metadata = {}
+    if os.path.exists(metadata_file):
+        with open(metadata_file) as f:
+            metadata = json.load(f)
+
     for speaker in speakers:
         stats = timeline.segment_stats(speaker)
         seg_count = sum(1 for s in timeline._segments if s.speaker_id == speaker)
@@ -101,7 +106,6 @@ def main():
             "skip": stats["median"] < 0.5,
         }
 
-    metadata_file = os.path.join(output_dir, "metadata.json")
     with open(metadata_file, 'w') as f:
         json.dump(metadata, f, indent=2)
     print(f"Metadata saved to: {metadata_file}")
