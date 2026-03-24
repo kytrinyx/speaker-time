@@ -2,26 +2,17 @@
 
 import sys
 import os
-import csv
-import json
 import shutil
 import subprocess
-import datetime
 
-scripts_dir = os.path.dirname(os.path.abspath(__file__))
-repo_dir = os.path.dirname(scripts_dir)
+repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-sys.path.insert(0, repo_dir)
-import anthropic
 
-from halfhalf.transcript import Transcript
-from halfhalf.prompts import build_prompts, cohost_for
-from halfhalf.transcriber import Transcriber
-from halfhalf.words import Words
-from halfhalf.word import Word
-from halfhalf.segment_splitter import HybridSplit, MAX_CHARS
-from dataclasses import replace
-from halfhalf.llm_corrections import generate_corrections, get_intro_rows, get_outro_rows
+def run(script, episode_id):
+    result = subprocess.run([os.path.join(repo_dir, "bin", script), episode_id], cwd=repo_dir)
+    if result.returncode != 0:
+        print(f"Error running {script}")
+        sys.exit(1)
 
 
 def main():
@@ -30,177 +21,19 @@ def main():
         sys.exit(1)
 
     episode_id = sys.argv[1]
+
+    run("transcribe", episode_id)
+    run("correct-intro-outro", episode_id)
+    run("split-segments", episode_id)
+    run("create-vtt", episode_id)
+
     output_dir = os.path.join(repo_dir, "output", episode_id)
-    timeline_file = os.path.join(output_dir, "timeline.csv")
-    metadata_file = os.path.join(output_dir, "metadata.json")
-    words_file = os.path.join(output_dir, "words.csv")
-
-    transcript = Transcript.load(episode_id)
-
-    for path in [timeline_file, transcript.path]:
-        if not os.path.exists(path):
-            print(f"Error: {path} not found")
-            sys.exit(1)
-
-    metadata = {}
-    if os.path.exists(metadata_file):
-        with open(metadata_file) as f:
-            metadata = json.load(f)
-
-    words_by_segment = {}
-    if os.path.exists(words_file):
-        with open(words_file) as f:
-            for row in csv.DictReader(f):
-                sid = int(row["segment_id"])
-                lang = row.get("language", "")
-                words_by_segment.setdefault((sid, lang), []).append(
-                    Word(row["word"], float(row["start_time"]), float(row["end_time"]))
-                )
-
-    words_csv = Words.load(words_file)
-    transcriber = Transcriber(build_prompts(episode_id), transcript, words_csv)
-
-    # Find all segments that need transcription
-    segments = []  # list of (segment_id, speaker_id, language, start_time, end_time, audio_file)
-    queued_ids = set()
-    timeline_by_segment = {}
-    with open(timeline_file) as f:
-        for i, row in enumerate(csv.DictReader(f), 1):
-            segment_id = int(row.get('segment_id', i))
-            speaker_id = row['SPEAKER_ID']
-            language = metadata.get(speaker_id, {}).get('language', 'en')
-            audio_file = os.path.join(output_dir, "audio", f"{segment_id:06d}.mp3")
-            timeline_by_segment[segment_id] = (speaker_id, language, float(row['start_time']), float(row['end_time']), audio_file)
-            if transcriber.needs_transcription(segment_id, language):
-                segments.append((segment_id, speaker_id, language, float(row['start_time']), float(row['end_time']), audio_file))
-                queued_ids.add(segment_id)
-
-    # Also retranscribe long segments that have no word-level data (can't be split without it)
-    for seg in transcript:
-        if seg.id in queued_ids:
-            continue
-        threshold = MAX_CHARS.get(seg.language, MAX_CHARS["default"])
-        if len(seg.raw_text) > threshold and (seg.id, seg.language) not in words_by_segment:
-            if seg.id in timeline_by_segment:
-                segments.append((seg.id, *timeline_by_segment[seg.id]))
-                queued_ids.add(seg.id)
-
-    if not segments:
-        print("No segments need transcription.")
-    else:
-        print(f"Found {len(segments)} segments needing transcription.")
-
-        today = datetime.date.today().strftime("%Y-%m-%d")
-        backup_file = os.path.join(output_dir, f"bk.{today}.transcription.csv")
-        shutil.copy2(transcript.path, backup_file)
-        print(f"Backed up transcription.csv to {os.path.basename(backup_file)}")
-
-        if os.path.exists(words_file):
-            words_backup = os.path.join(output_dir, f"bk.{today}.words.csv")
-            shutil.copy2(words_file, words_backup)
-            print(f"Backed up words.csv to {os.path.basename(words_backup)}")
-
-        for segment_id, speaker_id, language, start_time, end_time, audio_file in segments:
-            if not os.path.exists(audio_file):
-                print(f"Warning: audio file not found for segment {segment_id:06d}, skipping")
-                continue
-
-            print(f"Retranscribing segment {segment_id:06d} ({speaker_id}, {language})...")
-            try:
-                rows, new_words = transcriber.transcribe_segment(
-                    audio_file, segment_id, speaker_id, language, start_time, end_time
-                )
-            except Exception as e:
-                print(f"Error transcribing segment {segment_id:06d}: {e}")
-                continue
-
-            for row in rows:
-                transcript.upsert(row)
-            transcript.save()
-
-            languages = {row['language'] for row in rows}
-            words_csv.upsert_segment(segment_id, new_words, languages)
-            words_csv.save()
-            print(f"Updated words.csv ({len(new_words)} word rows for segment {segment_id:06d})")
-
-    corrections_path = transcript.corrections_path
-    retranscribed_ids = {seg_id for seg_id, *_ in segments}
-    all_segments = list(Transcript.load(episode_id))
-    intro_outro_ids = {s.id for s in get_intro_rows(all_segments) + get_outro_rows(all_segments, "ko") + get_outro_rows(all_segments, "en")}
-    needs_corrections = not os.path.exists(corrections_path) or bool(retranscribed_ids & intro_outro_ids)
-    if needs_corrections:
-        if os.path.exists(corrections_path):
-            os.remove(corrections_path)
-        corrections_path, corrections = generate_corrections(episode_id, cohost_for(episode_id), anthropic.Anthropic())
-        with open(corrections_path, "w") as f:
-            json.dump(corrections, f, ensure_ascii=False, indent=2)
-        print(f"Wrote {len(corrections)} intro/outro corrections to {os.path.basename(corrections_path)}")
-    else:
-        print("No intro/outro segments changed, skipping corrections.")
-
-    cache_file = os.path.join(output_dir, "split_segments.json")
-    cache = {}
-    if os.path.exists(cache_file):
-        with open(cache_file) as f:
-            cache = json.load(f)
-
-    # Reload words after any retranscription
-    words_by_segment = {}
-    if os.path.exists(words_file):
-        with open(words_file) as f:
-            for row in csv.DictReader(f):
-                sid = int(row["segment_id"])
-                lang = row.get("language", "")
-                words_by_segment.setdefault((sid, lang), []).append(
-                    Word(row["word"], float(row["start_time"]), float(row["end_time"]))
-                )
-
-    splitter = HybridSplit(episode_id=episode_id)
-    split_count = 0
-    skip_count = 0
-
-    for seg in transcript:
-        if (seg.id, seg.language) not in words_by_segment:
-            threshold = MAX_CHARS.get(seg.language, MAX_CHARS["default"])
-            if len(seg.raw_text) > threshold:
-                print(f"  [no words] segment {seg.id:06d}: {seg.raw_text[:60]!r}...")
-            continue
-        ts = replace(seg, words=words_by_segment[(seg.id, seg.language)])
-        key = str(seg.id)
-        if key in cache and cache[key]["source"] == seg.raw_text:
-            skip_count += 1
-            continue
-        cues = splitter.split(ts)
-        if len(cues) > 1:
-            cache[key] = {
-                "source": seg.raw_text,
-                "cues": [{"text": c.text, "start": c.start, "end": c.end} for c in cues],
-            }
-            split_count += 1
-        else:
-            threshold = MAX_CHARS.get(seg.language, MAX_CHARS["default"])
-            if len(seg.raw_text) > threshold:
-                print(f"  [unsplittable] segment {seg.id:06d}: {seg.raw_text[:60]!r}...")
-            if key in cache:
-                del cache[key]
-
-    with open(cache_file, "w") as f:
-        json.dump(cache, f, ensure_ascii=False, indent=2)
-
-    print(f"Split {split_count} segments, skipped {skip_count} unchanged")
-
-    create_vtt = os.path.join(repo_dir, "bin", "create-vtt")
-    result = subprocess.run([create_vtt, episode_id], cwd=repo_dir)
-    if result.returncode != 0:
-        print("Error running create-vtt")
-        sys.exit(1)
-
     subtitles_dir = os.environ.get("FINAL_HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
     for lang in ("ko", "en"):
-        vtt_src = os.path.join(output_dir, f"{episode_id}.{lang}-{lang}.vtt")
-        vtt_dst = os.path.join(subtitles_dir, f"{episode_id}.{lang}-{lang}.vtt")
-        shutil.copy2(vtt_src, vtt_dst)
-        print(f"Copied to {vtt_dst}")
+        src = os.path.join(output_dir, f"{episode_id}.{lang}-{lang}.vtt")
+        dst = os.path.join(subtitles_dir, f"{episode_id}.{lang}-{lang}.vtt")
+        shutil.copy2(src, dst)
+        print(f"Copied to {dst}")
 
 
 if __name__ == "__main__":

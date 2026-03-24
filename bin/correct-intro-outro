@@ -8,7 +8,9 @@ import anthropic
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from halfhalf.prompts import cohost_for
-from halfhalf.llm_corrections import generate_corrections
+from halfhalf.transcript import Transcript
+from halfhalf.llm_corrections import correct, get_intro_rows, get_outro_rows
+from halfhalf.sequence import Sequence
 
 
 def main():
@@ -17,21 +19,37 @@ def main():
         sys.exit(1)
 
     episode_id = sys.argv[1]
-
-    from halfhalf.transcript import Transcript
-    corrections_path = Transcript(episode_id).corrections_path
-    if os.path.exists(corrections_path):
-        print(f"Corrections already exist at {corrections_path}, skipping.")
-        return
-
     cohost = cohost_for(episode_id)
     client = anthropic.Anthropic()
 
-    corrections_path, corrections = generate_corrections(episode_id, cohost, client)
+    transcript = Transcript.load(episode_id)
+    segments = list(transcript)
 
-    with open(corrections_path, "w") as f:
-        json.dump(corrections, f, ensure_ascii=False, indent=2)
-    print(f"Wrote {len(corrections)} corrections to {corrections_path}")
+    cache_path = transcript.corrections_path
+    cache = {}
+    if os.path.exists(cache_path):
+        with open(cache_path) as f:
+            cache = json.load(f)
+
+    changed = False
+    for rows in [get_intro_rows(segments), get_outro_rows(segments, "ko"), get_outro_rows(segments, "en")]:
+        if not rows:
+            continue
+        seq = Sequence(rows)
+        if seq.id in cache and cache[seq.id]["cache_key"] == seq.text():
+            print(f"Sequence {seq.id} unchanged, skipping.")
+            continue
+        print(f"Generating corrections for sequence {seq.id}...")
+        cache[seq.id] = correct(seq, cohost, client)
+        changed = True
+
+    if changed:
+        with open(cache_path, "w") as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+        total = sum(len(v["corrections"]) for v in cache.values())
+        print(f"Wrote {total} corrections to {os.path.basename(cache_path)}")
+    else:
+        print("All sequences unchanged, skipping.")
 
 
 if __name__ == "__main__":

@@ -62,11 +62,14 @@ class Segment:
         )
 
     @property
+    def cleaned_text(self):
+        return clean(self.raw_text, self.language)
+
+    @property
     def text(self):
-        cleaned = clean(self.raw_text, self.language)
-        if self.override and self.override.source == cleaned:
+        if self.override and self.override.source == self.cleaned_text:
             return self.override.text
-        return cleaned
+        return self.cleaned_text
 
     def low_confidence(self):
         return self.confidence < -1.5

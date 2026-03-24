@@ -31,11 +31,14 @@ def claude_correct(rows, cohost, client):
         model=CLAUDE_MODEL,
         max_tokens=1024,
         system=(
-            f"You are correcting Whisper speech-to-text transcription errors in a podcast called "
-            f"하프앤하프 (Half and Half). The Korean host is 정태웅. The other host is {cohost}. "
-            f"Fix ONLY mis-transcriptions of the podcast name and host names (정태웅, {cohost}). "
-            f"Each segment includes a language field: use 하프앤하프 in Korean segments and Half and Half in English segments. "
-            f"Do not change anything else — not spelling, grammar, content, or anything outside of these specific names. "
+            f"You are correcting Whisper speech-to-text transcription errors in a podcast called 하프앤하프 (Half and Half). "
+            f"The Korean host is 정태웅. The English-speaking host is {cohost}. "
+            f"Valid Korean references to the show include '반반 팟캐스트' and '한국어 영어 반반 팟캐스트'. In English, Half & Half is valid. "
+            f"CRITICAL: Fix ONLY clear mis-transcriptions of the podcast name (하프앤하프 / Half and Half) and host names (정태웅, 지프/Jeep, 카트리나/Katrina). "
+            f"Do NOT change anything else — not spelling, grammar, punctuation, word choice, or any content outside of these specific names. "
+            f"Only correct the podcast name when it clearly refers to 하프앤하프 itself — do not change references to other podcasts or shows. "
+            f"In Korean segments, do not change between Korean transliterations and English spellings of host names (e.g. 카트리나/Katrina, 지프/Jeep are equivalent). "
+            f"Each segment includes a language field: use 하프앤하프 for mis-transcriptions in Korean segments and Half and Half for mis-transcriptions in English segments. "
             f"Names and phrases may be split across adjacent segments due to diarization artifacts — "
             f"use surrounding context to recognize and correct partial fragments. "
             f"If a segment's entire content was a fragment that has been absorbed into the correction of an adjacent segment, set that segment's text to an empty string. "
@@ -49,19 +52,16 @@ def claude_correct(rows, cohost, client):
     return json.loads(text)
 
 
-def generate_corrections(episode_id, cohost, client):
-    from .transcript import Transcript
-    transcript = Transcript.load(episode_id)
-    segments = list(transcript)
-
+def correct(sequence, cohost, client):
+    cache_key = sequence.text()
+    originals = {seg.id: seg.text for seg in sequence.segments}
+    result = claude_correct(sequence.segments, cohost, client)
     corrections = {}
-    for rows in [get_intro_rows(segments), get_outro_rows(segments, "ko"), get_outro_rows(segments, "en")]:
-        if not rows:
-            continue
-        originals = {seg.id: seg.text for seg in rows}
-        result = claude_correct(rows, cohost, client)
-        for seg_id, corrected in result.items():
-            if corrected != originals.get(int(seg_id)):
-                corrections[int(seg_id)] = corrected
+    for seg_id_str, corrected in result.items():
+        seg_id = int(seg_id_str)
+        source = originals.get(seg_id, "")
+        if corrected != source:
+            corrections[str(seg_id)] = {"source": source, "text": corrected}
+    return {"cache_key": cache_key, "corrections": corrections}
 
-    return transcript.corrections_path, corrections
+

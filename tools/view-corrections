@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from halfhalf.transcript import Transcript
+from halfhalf.llm_corrections import get_intro_rows, get_outro_rows
+from halfhalf.sequence import Sequence
+
+
+def show(label, rows):
+    if not rows:
+        return
+    seq = Sequence(rows)
+    diffs = seq.diffs()
+    if not diffs:
+        return
+    print(f"{label}:")
+    print(f"  cleaned: {seq.cleaned_text()}")
+    print(f"  text:    {seq.text()}")
+    print(f"  diffs:")
+    for a, b in diffs:
+        print(f"    {a!r} → {b!r}")
+
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: view-corrections <episode_id>")
+        sys.exit(1)
+
+    episode_id = sys.argv[1]
+    transcript = Transcript.load(episode_id)
+    segments = list(transcript)
+
+    show("Intro", get_intro_rows(segments))
+    show("Korean Outro", get_outro_rows(segments, "ko"))
+    show("English Outro", get_outro_rows(segments, "en"))
+
+
+if __name__ == "__main__":
+    main()
