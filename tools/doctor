@@ -55,6 +55,9 @@ def main():
                     Word(row["word"], float(row["start_time"]), float(row["end_time"]))
                 )
 
+    words_csv = Words.load(words_file)
+    transcriber = Transcriber(build_prompts(episode_id), transcript, words_csv)
+
     # Find all segments that need transcription
     segments = []  # list of (segment_id, speaker_id, language, start_time, end_time, audio_file)
     queued_ids = set()
@@ -99,9 +102,6 @@ def main():
             words_backup = os.path.join(output_dir, f"bk.{today}.words.csv")
             shutil.copy2(words_file, words_backup)
             print(f"Backed up words.csv to {os.path.basename(words_backup)}")
-
-        words_csv = Words.load(words_file)
-        transcriber = Transcriber(build_prompts(episode_id), transcript, words_csv)
 
         for segment_id, speaker_id, language, start_time, end_time, audio_file in segments:
             if not os.path.exists(audio_file):

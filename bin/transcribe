@@ -44,6 +44,8 @@ def main():
         with open(metadata_file, 'r') as f:
             metadata = json.load(f)
             for speaker, data in metadata.items():
+                if not isinstance(data, dict):
+                    continue
                 speaker_languages[speaker] = data.get("language", "en")
                 speaker_skip[speaker] = data.get("skip", False)
 
