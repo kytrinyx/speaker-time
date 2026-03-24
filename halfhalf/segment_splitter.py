@@ -2,6 +2,8 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
+from .cue import Cue
+
 
 @dataclass
 class Word:
@@ -23,13 +25,6 @@ class TranscriptionSegment:
         if self.language == "ko":
             return bool(re.fullmatch(r'[ㅋㅎ아어고으\s]+', self.text))
         return bool(re.fullmatch(r'[hH][aAeE]+([hH][aAeE]*)*[\s!.]*', self.text))
-
-
-@dataclass
-class Cue:
-    start: float
-    end: float
-    text: str
 
 
 def normalize(s):
