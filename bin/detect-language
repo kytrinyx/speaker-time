@@ -13,19 +13,19 @@ import whisper
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: detect-language <basename>")
+        print("Usage: detect-language <episode_id>")
         sys.exit(1)
 
-    basename = sys.argv[1]
-    timeline = Timeline.load(basename)
+    episode_id = sys.argv[1]
+    timeline = Timeline.load(episode_id)
     speakers = sorted({s.speaker_id for s in timeline._segments})
 
     model = whisper.load_model("small")
 
-    log_dir = os.path.join("output", basename, "language_detection")
+    log_dir = os.path.join("output", episode_id, "language_detection")
     os.makedirs(log_dir, exist_ok=True)
 
-    metadata_file = os.path.join("output", basename, "metadata.json")
+    metadata_file = os.path.join("output", episode_id, "metadata.json")
     metadata = {}
     if os.path.exists(metadata_file):
         with open(metadata_file) as f:

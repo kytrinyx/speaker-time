@@ -12,13 +12,13 @@ from halfhalf.transcript import Transcript
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: split-segments <basename>")
+        print("Usage: split-segments <episode_id>")
         sys.exit(1)
 
-    basename = sys.argv[1]
+    episode_id = sys.argv[1]
 
-    words_file = os.path.join("output", basename, "words.csv")
-    cache_file = os.path.join("output", basename, "split_segments.json")
+    words_file = os.path.join("output", episode_id, "words.csv")
+    cache_file = os.path.join("output", episode_id, "split_segments.json")
 
     if not os.path.exists(words_file):
         print("No words file found; nothing to split.")
@@ -40,7 +40,7 @@ def main():
                 Word(row["word"], float(row["start_time"]), float(row["end_time"]))
             )
 
-    transcript = Transcript.load(basename)
+    transcript = Transcript.load(episode_id)
     segments = []
     for row in transcript:
         text = row["text"].strip()

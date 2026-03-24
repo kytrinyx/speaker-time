@@ -6,13 +6,13 @@ COHOSTS = {
 }
 
 
-def cohost_for(basename):
-    prefix = basename.split('-ep-')[0] if '-ep-' in basename else 'jeep'
+def cohost_for(episode_id):
+    prefix = episode_id.split('-ep-')[0] if '-ep-' in episode_id else 'jeep'
     return COHOSTS.get(prefix, 'Jeep')
 
 
-def build_prompts(base_name):
-    prefix = base_name.split('-ep-')[0] if '-ep-' in base_name else 'jeep'
+def build_prompts(episode_id):
+    prefix = episode_id.split('-ep-')[0] if '-ep-' in episode_id else 'jeep'
     cohost = COHOSTS.get(prefix, 'Jeep')
     return {
         'en': f"This is Half & Half podcast with hosts {cohost} and 태웅쌤 (정태웅).",

@@ -39,7 +39,7 @@ Downloads a YouTube video as MP3 and determines the next episode filename based 
 ./bin/download https://www.youtube.com/watch?v=... --jeep
 ```
 
-This counts existing `output/jeep*` directories to determine the episode number, downloads the audio as e.g. `audio/jeep-ep-004.mp3`, and prints the basename:
+This counts existing `output/jeep*` directories to determine the episode number, downloads the audio as e.g. `audio/jeep-ep-004.mp3`, and prints the episode_id:
 ```
 jeep-ep-004
 ```
@@ -68,7 +68,7 @@ Performs speaker diarization, generates timeline CSV, and adds per-speaker stats
 
 **Usage:**
 ```bash
-./bin/diarize <basename>
+./bin/diarize <episode_id>
 ```
 
 ### `cut-audio`
@@ -76,7 +76,7 @@ Cuts audio into segments based on timeline CSV.
 
 **Usage:**
 ```bash
-./bin/cut-audio <basename>
+./bin/cut-audio <episode_id>
 ```
 
 ### `detect-language`
@@ -84,7 +84,7 @@ Generates language samples and detects speaker languages.
 
 **Usage:**
 ```bash
-./bin/detect-language <basename>
+./bin/detect-language <episode_id>
 ```
 
 ### `transcribe`
@@ -92,11 +92,11 @@ Transcribes audio segments with language hints. Captures word-level timestamps a
 
 For bilingual content, code-switching causes Whisper to produce garbage or silent mistranslations when the audio language doesn't match the hint. After each transcription, if the confidence score is below -1.5 or is 0.0 (indicating a timeout or empty result), the segment is retranscribed with the opposite language hint. Both results are stored in `transcription.csv`; downstream steps use whichever has higher confidence.
 
-An `initial_prompt` is passed to Whisper for each segment to improve transcription of proper nouns (host names, show name). Prompts are episode-specific and built from `halfhalf/prompts.py` based on the basename prefix.
+An `initial_prompt` is passed to Whisper for each segment to improve transcription of proper nouns (host names, show name). Prompts are episode-specific and built from `halfhalf/prompts.py` based on the episode_id prefix.
 
 **Usage:**
 ```bash
-./bin/transcribe <basename>
+./bin/transcribe <episode_id>
 ```
 
 **Output:**
@@ -108,7 +108,7 @@ Applies `HybridSplit` to each transcription segment to produce shorter, more rea
 
 **Usage:**
 ```bash
-./bin/split-segments <basename>
+./bin/split-segments <episode_id>
 ```
 
 **Output:**
@@ -121,7 +121,7 @@ Converts transcription CSV to WebVTT subtitle format. Skips segments that are em
 
 **Usage:**
 ```bash
-./bin/create-vtt <basename>
+./bin/create-vtt <episode_id>
 ```
 
 **Example:**
@@ -142,7 +142,7 @@ Skips the segment if existing confidence is already good (≥ -1.5 and non-zero)
 
 **Usage:**
 ```bash
-./tools/transcribe-cue <basename> <segment_id>
+./tools/transcribe-cue <episode_id> <segment_id>
 ```
 
 **Example:**
@@ -157,8 +157,8 @@ Re-runs the cue splitting logic for a single segment and patches the VTT file in
 
 **Usage:**
 ```bash
-./tools/split-cue <basename> <segment_id>            # replace cues in the .vtt file
-./tools/split-cue <basename> <segment_id> --dry-run  # print new cues to stdout only
+./tools/split-cue <episode_id> <segment_id>            # replace cues in the .vtt file
+./tools/split-cue <episode_id> <segment_id> --dry-run  # print new cues to stdout only
 ```
 
 **Example:**

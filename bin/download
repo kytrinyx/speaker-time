@@ -29,7 +29,7 @@ def main():
     project_root = os.path.dirname(script_dir)
     pattern = os.path.join(project_root, "output", f"{cohost}*")
     number = len(glob.glob(pattern)) + 1
-    basename = f"{cohost}-ep-{number:03d}"
+    episode_id = f"{cohost}-ep-{number:03d}"
 
     parsed = urlparse(url)
     if parsed.hostname in ("youtu.be",):
@@ -40,7 +40,7 @@ def main():
     audio_dir = os.path.join(project_root, "audio")
     os.makedirs(audio_dir, exist_ok=True)
 
-    output_dir = os.path.join(project_root, "output", basename)
+    output_dir = os.path.join(project_root, "output", episode_id)
     os.makedirs(output_dir, exist_ok=True)
 
     title_result = subprocess.run(
@@ -61,18 +61,18 @@ def main():
         with open(metadata_file, "w") as f:
             json.dump(metadata, f, indent=2)
 
-    mp3_path = os.path.join(audio_dir, f"{basename}.mp3")
+    mp3_path = os.path.join(audio_dir, f"{episode_id}.mp3")
     if os.path.exists(mp3_path):
-        print(f"{basename} already exists at audio/{basename}.mp3", file=sys.stderr)
+        print(f"{episode_id} already exists at audio/{episode_id}.mp3", file=sys.stderr)
         sys.exit(1)
 
     subprocess.run(
         ["yt-dlp", "--extract-audio", "--audio-format=mp3",
-         "-o", os.path.join(audio_dir, f"{basename}.%(ext)s"), url],
+         "-o", os.path.join(audio_dir, f"{episode_id}.%(ext)s"), url],
         check=True,
         stdout=sys.stderr,
     )
-    print(basename)
+    print(episode_id)
 
 if __name__ == "__main__":
     main()

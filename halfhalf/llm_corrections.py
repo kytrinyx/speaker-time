@@ -44,9 +44,9 @@ def claude_correct(rows, cohost, client):
     return json.loads(text)
 
 
-def generate_corrections(basename, cohost, client):
+def generate_corrections(episode_id, cohost, client):
     from .transcript import Transcript
-    transcript = Transcript.load(basename)
+    transcript = Transcript.load(episode_id)
     segments = [row for row in transcript if row["text"].strip()]
 
     corrections = {}

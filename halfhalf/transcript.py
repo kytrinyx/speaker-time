@@ -8,16 +8,16 @@ FIELDNAMES = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'lan
 
 
 class Transcript:
-    def __init__(self, basename):
-        self.basename = basename
-        self.path = os.path.join("output", basename, "transcription.csv")
-        self._corrections_path = os.path.join("output", basename, "intro_outro_corrections.json")
+    def __init__(self, episode_id):
+        self.episode_id = episode_id
+        self.path = os.path.join("output", episode_id, "transcription.csv")
+        self._corrections_path = os.path.join("output", episode_id, "intro_outro_corrections.json")
         self._rows = {}  # {(segment_id, language): row}
         self._intro_outro_corrections = {}  # {segment_id: corrected_text}
 
     @classmethod
-    def load(cls, basename):
-        t = cls(basename)
+    def load(cls, episode_id):
+        t = cls(episode_id)
         if not os.path.exists(t.path):
             return t
         with open(t.path, newline='') as f:

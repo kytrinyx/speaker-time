@@ -11,13 +11,13 @@ from halfhalf.timeline import Timeline
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: diarize <basename>")
+        print("Usage: diarize <episode_id>")
         sys.exit(1)
 
-    base_name = sys.argv[1]
-    absolute_path = os.path.abspath(os.path.join("audio", f"{base_name}.mp3"))
+    episode_id = sys.argv[1]
+    absolute_path = os.path.abspath(os.path.join("audio", f"{episode_id}.mp3"))
 
-    output_dir = os.path.join("output", base_name)
+    output_dir = os.path.join("output", episode_id)
     os.makedirs(output_dir, exist_ok=True)
     csv_filename = os.path.join(output_dir, "timeline.csv")
 
@@ -80,7 +80,7 @@ def main():
     print(f"Total segments: {len(resolved_segments)}")
 
     # Write per-speaker stats to metadata.json
-    timeline = Timeline.load(base_name)
+    timeline = Timeline.load(episode_id)
     distribution = timeline.airtime_distribution()
     speakers = sorted(distribution)
 

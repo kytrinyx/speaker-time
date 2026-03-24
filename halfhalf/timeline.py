@@ -21,8 +21,8 @@ class Timeline:
         self._segments = segments  # list of TimelineSegment
 
     @classmethod
-    def load(cls, basename):
-        path = f"output/{basename}/timeline.csv"
+    def load(cls, episode_id):
+        path = f"output/{episode_id}/timeline.csv"
         segments = []
         with open(path, newline="") as f:
             for idx, row in enumerate(csv.DictReader(f)):
@@ -32,7 +32,7 @@ class Timeline:
                     speaker_id=row["SPEAKER_ID"],
                     start=float(row["start_time"]),
                     end=float(row["end_time"]),
-                    audio_path=f"output/{basename}/audio/{segment_id:06d}.mp3",
+                    audio_path=f"output/{episode_id}/audio/{segment_id:06d}.mp3",
                 ))
         return cls(segments)
 

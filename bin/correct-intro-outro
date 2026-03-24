@@ -13,21 +13,21 @@ from halfhalf.llm_corrections import generate_corrections
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: correct-intro-outro <basename>")
+        print("Usage: correct-intro-outro <episode_id>")
         sys.exit(1)
 
-    basename = sys.argv[1]
+    episode_id = sys.argv[1]
 
     from halfhalf.transcript import Transcript
-    corrections_path = Transcript(basename).corrections_path
+    corrections_path = Transcript(episode_id).corrections_path
     if os.path.exists(corrections_path):
         print(f"Corrections already exist at {corrections_path}, skipping.")
         return
 
-    cohost = cohost_for(basename)
+    cohost = cohost_for(episode_id)
     client = anthropic.Anthropic()
 
-    corrections_path, corrections = generate_corrections(basename, cohost, client)
+    corrections_path, corrections = generate_corrections(episode_id, cohost, client)
 
     with open(corrections_path, "w") as f:
         json.dump(corrections, f, ensure_ascii=False, indent=2)

@@ -13,13 +13,13 @@ from halfhalf.words import Words
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: transcribe <basename>")
+        print("Usage: transcribe <episode_id>")
         sys.exit(1)
 
-    base_name = sys.argv[1]
-    prompts = build_prompts(base_name)
+    episode_id = sys.argv[1]
+    prompts = build_prompts(episode_id)
 
-    output_dir = os.path.join("output", base_name)
+    output_dir = os.path.join("output", episode_id)
     timeline_file = os.path.join(output_dir, "timeline.csv")
     metadata_file = os.path.join(output_dir, "metadata.json")
     audio_dir = os.path.join(output_dir, "audio")
@@ -57,7 +57,7 @@ def main():
             timeline_data.append(row)
 
     words_file = os.path.join(output_dir, "words.csv")
-    transcript = Transcript.load(base_name)
+    transcript = Transcript.load(episode_id)
     words_csv = Words.load(words_file)
 
     # Transcribe each audio segment

@@ -16,23 +16,23 @@ from halfhalf.words import Words
 
 def main():
     if len(sys.argv) != 3:
-        print("Usage: transcribe-cue <basename> <segment_id>")
+        print("Usage: transcribe-cue <episode_id> <segment_id>")
         sys.exit(1)
 
-    base_name = sys.argv[1]
+    episode_id = sys.argv[1]
     segment_id = int(sys.argv[2])
-    prompts = build_prompts(base_name)
+    prompts = build_prompts(episode_id)
 
-    output_dir = os.path.join("output", base_name)
+    output_dir = os.path.join("output", episode_id)
     timeline_file = os.path.join(output_dir, "timeline.csv")
     metadata_file = os.path.join(output_dir, "metadata.json")
     words_file = os.path.join(output_dir, "words.csv")
     audio_file = os.path.join(output_dir, "audio", f"{segment_id:06d}.mp3")
 
     os.makedirs("logs", exist_ok=True)
-    log_file = os.path.join("logs", f"transcribe-cue.{base_name}.log")
+    log_file = os.path.join("logs", f"transcribe-cue.{episode_id}.log")
 
-    transcript = Transcript.load(base_name)
+    transcript = Transcript.load(episode_id)
 
     for path in [timeline_file, transcript.path, audio_file]:
         if not os.path.exists(path):
