@@ -212,7 +212,8 @@ def main():
         sys.exit(1)
 
     vtt_src = os.path.join(output_dir, f"{episode_id}.vtt")
-    vtt_dst = os.path.expanduser(f"~/Desktop/{episode_id}.vtt")
+    subtitles_dir = os.environ.get("FINAL_HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
+    vtt_dst = os.path.join(subtitles_dir, f"{episode_id}.vtt")
     shutil.copy2(vtt_src, vtt_dst)
     print(f"Copied to {vtt_dst}")
 

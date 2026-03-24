@@ -49,14 +49,20 @@ def main():
         run_script("split-segments", episode_id)
         run_script("create-vtt", episode_id)
 
-        # Copy VTT file to Desktop
+        # Copy VTT file to subtitles directory
         vtt_file = os.path.join("output", episode_id, f"{episode_id}.vtt")
-        desktop_path = os.path.expanduser("~/Desktop/")
+        subtitles_dir = os.environ.get("FINAL_HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
         if os.path.exists(vtt_file):
-            shutil.copy(vtt_file, desktop_path)
-            print(f"VTT file copied to {desktop_path}")
+            shutil.copy(vtt_file, subtitles_dir)
+            print(f"VTT file copied to {subtitles_dir}")
         else:
             print(f"Warning: VTT file not found at {vtt_file}")
+
+        index_path = os.path.join(os.path.dirname(__file__), "..", "tools", "index")
+        index_file = os.path.join(subtitles_dir, "_INDEX.txt")
+        with open(index_file, "w") as f:
+            subprocess.run([index_path], stdout=f, check=True)
+        print(f"Index written to {index_file}")
 
         print(f"\n=== Pipeline completed successfully for {episode_id} ===")
 
