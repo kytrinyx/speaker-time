@@ -32,6 +32,7 @@ CORRECTIONS = [
     ("하프하프", "하프앤하프"),
     ("하프&하프", "하프앤하프"),
     ("반만 팟캐스트 하프앤하프", "반반 팟캐스트 하프앤하프"),
+    ("하프앤하프앤하프앤하프", "하프앤하프"),
 
     # Host name variants (정태웅)
     ("정케홍", "정태웅"),
@@ -47,6 +48,7 @@ CORRECTIONS = [
 
     # Podcast name variants (Half and Half)
     ("Hathenah", "Half and Half"),
+    ("Heffernan", "Half and Half"),
 
     # Jeep co-host name variants
     ("ZIF", "Jeep"),
