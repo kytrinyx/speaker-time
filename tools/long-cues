@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import re
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from halfhalf.captions import Captions
+
+MAX_CHARS = {"ko": 45, "default": 80}
+
+
+def cue_lang(text):
+    return "ko" if re.search(r'[\uAC00-\uD7A3]', text) else "default"
+
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: long-cues <episode_id>")
+        sys.exit(1)
+
+    episode_id = sys.argv[1]
+    captions = Captions.load(episode_id)
+
+    for cue in captions:
+        threshold = MAX_CHARS[cue_lang(cue.text)]
+        if len(cue.text) > threshold:
+            print(cue)
+            print()
+
+if __name__ == "__main__":
+    main()
