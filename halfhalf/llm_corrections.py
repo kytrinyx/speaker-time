@@ -10,7 +10,7 @@ CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 def get_intro_rows(segments):
     rows = []
     for seg in segments:
-        if seg.language == "en":
+        if seg.derived_language == "en":
             break
         rows.append(seg)
         if len(rows) >= INTRO_KO_LINES:
@@ -20,7 +20,7 @@ def get_intro_rows(segments):
 
 def get_outro_rows(segments, language):
     tail = segments[-OUTRO_LINES:]
-    rows = [s for s in tail if s.language == language]
+    rows = [s for s in tail if s.derived_language == language]
     n = OUTRO_KO_LINES if language == "ko" else OUTRO_EN_LINES
     return rows[-n:]
 
