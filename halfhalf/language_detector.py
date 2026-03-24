@@ -3,6 +3,9 @@ import os
 import whisper
 
 
+CONFIDENCE_THRESHOLD = 0.9
+
+
 def detect_language(audio_file, model, debug=False):
     """Detect the language of an audio file using multi-chunk averaging.
 
@@ -75,8 +78,6 @@ def _append_log(path, entries):
 
 
 class SerialLanguageDetector:
-    CONFIDENCE_THRESHOLD = 0.9
-
     def __init__(self, segments):
         self._segments = sorted(segments, key=lambda s: s.duration, reverse=True)
         self.log = []
@@ -93,7 +94,6 @@ class SerialLanguageDetector:
 
 
 class ConcatenatingLanguageDetector:
-    CONFIDENCE_THRESHOLD = 0.9
     TARGET_DURATION = 30.0
 
     def __init__(self, segments):

@@ -6,7 +6,7 @@ import json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from halfhalf.timeline import Timeline
-from halfhalf.language_detector import SerialLanguageDetector, ConcatenatingLanguageDetector
+from halfhalf.language_detector import SerialLanguageDetector, ConcatenatingLanguageDetector, CONFIDENCE_THRESHOLD
 
 import whisper
 
@@ -40,6 +40,14 @@ def main():
 
         segments = [s for s in timeline._segments if s.speaker_id == speaker_id]
         log_path = os.path.join(log_dir, f"{speaker_id}.log.json")
+
+        if os.path.exists(log_path):
+            with open(log_path) as f:
+                existing_log = json.load(f)
+            if any(entry["confidence"] >= CONFIDENCE_THRESHOLD for entry in existing_log):
+                print(f"{speaker_id}: skipped (already detected with confidence)")
+                continue
+
         concat_path = os.path.join(log_dir, f"{speaker_id}.concatenated.mp3")
 
         longest = max(s.duration for s in segments)
