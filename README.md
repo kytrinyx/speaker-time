@@ -152,19 +152,19 @@ Skips the segment if existing confidence is already good (≥ -1.5 and non-zero)
 
 **Requires:** Whisper model (same as `transcribe`).
 
-### `split-cue`
+### `split-segment`
 Re-runs the cue splitting logic for a single segment and patches the VTT file in place. Useful when `create-vtt` produces a long or poorly split cue and you want to fix just that one segment without rerunning the whole pipeline.
 
 **Usage:**
 ```bash
-./tools/split-cue <episode_id> <segment_id>            # replace cues in the .vtt file
-./tools/split-cue <episode_id> <segment_id> --dry-run  # print new cues to stdout only
+./tools/split-segment <episode_id> <segment_id>            # replace cues in the .vtt file
+./tools/split-segment <episode_id> <segment_id> --dry-run  # print new cues to stdout only
 ```
 
 **Example:**
 ```bash
-./tools/split-cue sample-ep-001 42            # apply the split
-./tools/split-cue sample-ep-001 42 --dry-run  # inspect proposed split
+./tools/split-segment sample-ep-001 42            # apply the split
+./tools/split-segment sample-ep-001 42 --dry-run  # inspect proposed split
 ```
 
 **Requires:** Ollama running locally (same as `create-vtt`).
