@@ -61,7 +61,7 @@ def main():
         if not seg.is_filler():
             segments.append(seg)
 
-    splitter = HybridSplit()
+    splitter = HybridSplit(episode_id=episode_id)
     split_count = 0
     skip_count = 0
 

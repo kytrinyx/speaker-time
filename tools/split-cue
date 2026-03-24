@@ -6,7 +6,7 @@ import csv
 import json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from halfhalf.segment_splitter import Word, TranscriptionSegment, HybridSplit
+from halfhalf.segment_splitter import Word, TranscriptionSegment, HybridSplit, PunctuationSplit, OllamaSplit, MAX_CHARS
 from halfhalf.transcript import Transcript
 
 
@@ -22,13 +22,14 @@ def main():
     flags = [a for a in sys.argv[1:] if a.startswith("--")]
 
     if len(args) != 2:
-        print("Usage: split-cue <episode_id> <segment_id> [--dry-run]")
+        print("Usage: split-cue <episode_id> <segment_id> [--dry-run] [--debug]")
         print("Example: split-cue katrina-ep-009 973")
         sys.exit(1)
 
     episode_id = args[0]
     segment_id = int(args[1])
     dry_run = "--dry-run" in flags
+    debug = "--debug" in flags
 
     words_file = os.path.join("output", episode_id, "words.csv")
     cache_file = os.path.join("output", episode_id, "split_segments.json")
@@ -62,7 +63,46 @@ def main():
 
     segment.words = words
 
-    cues = HybridSplit().split(segment)
+    if debug:
+        threshold = MAX_CHARS.get(row.get("language", ""), MAX_CHARS["default"])
+        print(f"segment {segment_id}: {len(text)} chars (threshold {threshold}), {len(words)} words")
+        if words:
+            print(f"  words: {' '.join(w.text for w in words[:10])}{'...' if len(words) > 10 else ''}")
+        print()
+
+        punct_cues = PunctuationSplit().split(segment)
+        print(f"PunctuationSplit → {len(punct_cues)} cue(s):")
+        for c in punct_cues:
+            flag = " [LONG]" if len(c.text) > threshold else ""
+            print(f"  [{len(c.text):3d}]{flag} {c.text}")
+        print()
+
+        for c in punct_cues:
+            if len(c.text) > threshold:
+                cue_words = [w for w in words if w.end > c.start and w.start < c.end]
+                print(f"OllamaSplit on: {c.text!r}")
+                print(f"  {len(cue_words)} words passed to Ollama")
+                import urllib.request, json as _json
+                numbered = "\n".join(f"{i}: {w.text.strip()}" for i, w in enumerate(cue_words))
+                prompt = (
+                    "The following is a numbered list of words from a speech transcript.\n"
+                    "Return all natural clause and phrase boundaries as a comma-separated list "
+                    "of word indices where a new phrase begins. Include every possible boundary, "
+                    "not just major splits. Do not include 0. Do not explain.\n\n"
+                    f"{numbered}"
+                )
+                payload = _json.dumps({"model": "exaone3.5:latest", "prompt": prompt, "stream": False, "options": {"temperature": 0}}).encode()
+                req = urllib.request.Request("http://localhost:11434/api/generate", data=payload, headers={"Content-Type": "application/json"})
+                try:
+                    with urllib.request.urlopen(req, timeout=120) as resp:
+                        result = _json.loads(resp.read())
+                    raw = result["response"].strip()
+                    print(f"  Ollama raw response: {raw!r}")
+                except Exception as e:
+                    print(f"  Ollama error: {e}")
+                print()
+
+    cues = HybridSplit(episode_id=episode_id).split(segment)
 
     if dry_run:
         for cue in cues:

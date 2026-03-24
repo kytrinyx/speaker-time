@@ -1,3 +1,4 @@
+import os
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -122,9 +123,21 @@ class OllamaSplit:
 
     name = "ollama"
 
-    def __init__(self, model="exaone3.5:latest"):
+    def __init__(self, model="exaone3.5:latest", cache_path=None):
         self.model = model
         self.name = f"ollama({model})"
+        self.cache_path = cache_path
+        self._cache = {}
+        if cache_path and os.path.exists(cache_path):
+            import json
+            with open(cache_path) as f:
+                self._cache = json.load(f)
+
+    def _save_cache(self):
+        if self.cache_path:
+            import json
+            with open(self.cache_path, "w") as f:
+                json.dump(self._cache, f, ensure_ascii=False, indent=2)
 
     def split(self, segment):
         if not segment.words:
@@ -132,37 +145,45 @@ class OllamaSplit:
 
         import urllib.request, json
 
-        numbered = "\n".join(f"{i}: {w.text.strip()}" for i, w in enumerate(segment.words))
-        prompt = (
-            "The following is a numbered list of words from a speech transcript.\n"
-            "Return only the indices where a new clause should begin (i.e. split points), "
-            "as a comma-separated list of integers. Do not include 0. Do not explain.\n\n"
-            f"{numbered}"
-        )
+        source = segment.text
+        if source in self._cache:
+            split_points = self._cache[source]
+        else:
+            numbered = "\n".join(f"{i}: {w.text.strip()}" for i, w in enumerate(segment.words))
+            prompt = (
+                "The following is a numbered list of words from a speech transcript.\n"
+                "Return all natural clause and phrase boundaries as a comma-separated list "
+                "of word indices where a new phrase begins. Include every possible boundary, "
+                "not just major splits. Do not include 0. Do not explain.\n\n"
+                f"{numbered}"
+            )
 
-        payload = json.dumps({
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0},
-        }).encode()
+            payload = json.dumps({
+                "model": self.model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0},
+            }).encode()
 
-        req = urllib.request.Request(
-            "http://localhost:11434/api/generate",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            result = json.loads(resp.read())
+            req = urllib.request.Request(
+                "http://localhost:11434/api/generate",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                result = json.loads(resp.read())
 
-        raw = result["response"].strip()
-        try:
-            split_points = sorted(set(
-                int(x.strip()) for x in raw.split(",")
-                if x.strip().isdigit()
-            ))
-        except ValueError:
-            return [Cue(segment.start, segment.end, segment.text)]
+            raw = result["response"].strip()
+            try:
+                split_points = sorted(set(
+                    int(x.strip()) for x in raw.split(",")
+                    if x.strip().isdigit()
+                ))
+            except ValueError:
+                return [Cue(segment.start, segment.end, segment.text)]
+
+            self._cache[source] = split_points
+            self._save_cache()
 
         # Filter to valid indices and build slice boundaries
         n = len(segment.words)
@@ -180,10 +201,12 @@ class OllamaSplit:
 class HybridSplit:
     """Punctuation split first; ollama sub-splits cues that are still too long; merge short fragments."""
 
-    def __init__(self, max_chars_by_lang=None, model="exaone3.5:latest"):
+    def __init__(self, max_chars_by_lang=None, model="exaone3.5:latest", cache_path=None, episode_id=None):
         self.max_chars_by_lang = max_chars_by_lang if max_chars_by_lang is not None else MAX_CHARS
         self._punct = PunctuationSplit(max_chars_by_lang=self.max_chars_by_lang)
-        self._ollama = OllamaSplit(model=model)
+        if cache_path is None and episode_id is not None:
+            cache_path = os.path.join("output", episode_id, "ollama_cache.json")
+        self._ollama = OllamaSplit(model=model, cache_path=cache_path)
         parts = ", ".join(f"{k}={v}" for k, v in self.max_chars_by_lang.items())
         self.name = f"hybrid({parts})"
 
