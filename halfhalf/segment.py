@@ -1,8 +1,15 @@
 import re
 from dataclasses import dataclass, field
+from typing import Optional
 
 from .corrections import apply as apply_corrections
 from .word import Word  # noqa: F401 — re-exported for callers that import Word from here
+
+
+@dataclass
+class Override:
+    source: str
+    text: str
 
 
 def _collapse(text, language):
@@ -39,9 +46,10 @@ class Segment:
     confidence: float = 0.0
     speaker_id: str = ""
     words: list = field(default_factory=list)
+    override: Optional[Override] = None
 
     @classmethod
-    def from_dict(cls, row):
+    def from_dict(cls, row, override=None):
         return cls(
             id=int(row['segment_id']),
             start=float(row['start_time']),
@@ -50,11 +58,15 @@ class Segment:
             language=row['language'],
             confidence=float(row['confidence']),
             speaker_id=row['speaker_id'],
+            override=override,
         )
 
     @property
     def text(self):
-        return clean(self.raw_text, self.language)
+        cleaned = clean(self.raw_text, self.language)
+        if self.override and self.override.source == cleaned:
+            return self.override.text
+        return cleaned
 
     def low_confidence(self):
         return self.confidence < -1.5

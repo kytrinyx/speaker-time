@@ -1,9 +1,8 @@
 import csv
 import json
 import os
-from dataclasses import replace
 
-from .segment import Segment
+from .segment import Segment, Override
 
 FIELDNAMES = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
 
@@ -12,9 +11,9 @@ class Transcript:
     def __init__(self, episode_id):
         self.episode_id = episode_id
         self.path = os.path.join("output", episode_id, "transcription.csv")
-        self._corrections_path = os.path.join("output", episode_id, "intro_outro_corrections.json")
+        self._corrections_path = os.path.join("output", episode_id, "llm_corrections_cache.json")
         self._rows = {}  # {(segment_id, language): row}
-        self._intro_outro_corrections = {}  # {segment_id: corrected_text}
+        self._overrides = {}  # {segment_id: Override}
 
     @classmethod
     def load(cls, episode_id):
@@ -27,7 +26,12 @@ class Transcript:
                 t._rows[key] = row
         if os.path.exists(t._corrections_path):
             with open(t._corrections_path) as f:
-                t._intro_outro_corrections = {int(k): v for k, v in json.load(f).items()}
+                data = json.load(f)
+                for sequence in data.values():
+                    for seg_id, override in sequence["corrections"].items():
+                        t._overrides[int(seg_id)] = Override(
+                            source=override["source"], text=override["text"]
+                        )
         return t
 
     @property
@@ -71,8 +75,6 @@ class Transcript:
             if segment_id not in by_segment or float(row['confidence']) > float(by_segment[segment_id]['confidence']):
                 by_segment[segment_id] = row
         for segment_id in sorted(by_segment):
-            seg = Segment.from_dict(by_segment[segment_id])
-            if segment_id in self._intro_outro_corrections:
-                seg = replace(seg, raw_text=self._intro_outro_corrections[segment_id])
+            seg = Segment.from_dict(by_segment[segment_id], override=self._overrides.get(segment_id))
             if seg.text:
                 yield seg
