@@ -15,6 +15,10 @@ def _is_filler(text, lang):
 def _collapse_korean(text):
     return re.sub(r'([\uAC00-\uD7A3])\1{4,}', r'\1\1\1', text)
 
+
+def _collapse_m(text):
+    return re.sub(r'[Mm]{3,}', 'Mmm', text)
+
 FIELDNAMES = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
 
 
@@ -88,6 +92,7 @@ class Transcript:
             lang = row.get('language', '')
             if lang == 'ko':
                 row['text'] = _collapse_korean(row['text'])
+            row['text'] = _collapse_m(row['text'])
             if _is_filler(row['text'].strip(), lang):
                 continue
             yield row
