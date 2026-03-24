@@ -135,19 +135,19 @@ Converts transcription CSV to WebVTT subtitle format. Skips segments that are em
 
 ## Tools
 
-### `transcribe-cue`
+### `transcribe-segment`
 Re-transcribes a single audio segment and patches both `transcription.csv` and `words.csv` in place. Useful when a segment has a bad transcription and you want to fix just that one without rerunning the full transcription step.
 
 Skips the segment if existing confidence is already good (≥ -1.5 and non-zero). Otherwise transcribes with the speaker's assigned language hint; if the result is still low confidence, retranscribes with the opposite language. Both results are stored when the alt language is tried.
 
 **Usage:**
 ```bash
-./tools/transcribe-cue <episode_id> <segment_id>
+./tools/transcribe-segment <episode_id> <segment_id>
 ```
 
 **Example:**
 ```bash
-./tools/transcribe-cue sample-ep-001 42
+./tools/transcribe-segment sample-ep-001 42
 ```
 
 **Requires:** Whisper model (same as `transcribe`).
