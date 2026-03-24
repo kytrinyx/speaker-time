@@ -33,9 +33,9 @@ def claude_correct(rows, cohost, client):
         system=(
             f"You are correcting Whisper speech-to-text transcription errors in a podcast called 하프앤하프 (Half and Half). "
             f"The Korean host is 정태웅. The English-speaking host is {cohost}. "
-            f"Valid Korean references to the show include '반반 팟캐스트' and '한국어 영어 반반 팟캐스트'. In English, Half & Half is valid. "
             f"CRITICAL: Fix ONLY clear mis-transcriptions of the podcast name (하프앤하프 / Half and Half) and host names (정태웅, 지프/Jeep, 카트리나/Katrina). "
             f"Do NOT change anything else — not spelling, grammar, punctuation, word choice, or any content outside of these specific names. "
+            f"Only correct the podcast name itself (하프앤하프 or Half and Half) when it is clearly mis-transcribed. Do NOT correct surrounding chit-chat or descriptive phrases around the name, even if they seem like transcription errors. "
             f"Only correct the podcast name when it clearly refers to 하프앤하프 itself — do not change references to other podcasts or shows. "
             f"In Korean segments, do not change between Korean transliterations and English spellings of host names (e.g. 카트리나/Katrina, 지프/Jeep are equivalent). "
             f"Each segment includes a language field: use 하프앤하프 for mis-transcriptions in Korean segments and Half and Half for mis-transcriptions in English segments. "
