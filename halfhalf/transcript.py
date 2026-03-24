@@ -37,10 +37,12 @@ class Transcript:
         return (segment_id, language) in self._rows
 
     def needs_transcription(self, segment_id, language):
-        row = self._rows.get((segment_id, language))
-        if row is None:
-            return True
-        return float(row['confidence']) < -1.5
+        if self.contains(segment_id, language):
+            return False
+        for (sid, lang), row in self._rows.items():
+            if sid == segment_id and not self.low_confidence(sid, lang):
+                return False
+        return True
 
     def low_confidence(self, segment_id, language):
         row = self._rows.get((segment_id, language))
