@@ -4,9 +4,11 @@ import sys
 import os
 import csv
 import json
+from dataclasses import replace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from halfhalf.segment_splitter import Word, TranscriptionSegment, HybridSplit, PunctuationSplit, OllamaSplit, MAX_CHARS
+from halfhalf.word import Word
+from halfhalf.segment_splitter import HybridSplit, PunctuationSplit, OllamaSplit, MAX_CHARS
 from halfhalf.transcript import Transcript
 
 
@@ -35,37 +37,28 @@ def main():
     cache_file = os.path.join("output", episode_id, "split_segments.json")
 
     transcript = Transcript.load(episode_id)
-    row = next((r for r in transcript if int(r["segment_id"]) == segment_id), None)
+    seg = next((s for s in transcript if s.id == segment_id), None)
 
-    if row is None:
+    if seg is None:
         print(f"Error: segment {segment_id} not found in {transcript.path}")
         sys.exit(1)
 
-    text = row["text"].strip()
-    if not text or text == "[TIMEOUT]":
+    if not seg.text:
         print(f"Error: segment {segment_id} has no usable text")
         sys.exit(1)
-
-    segment = TranscriptionSegment(
-        id=segment_id,
-        start=float(row["start_time"]),
-        end=float(row["end_time"]),
-        text=text,
-        language=row.get("language", ""),
-    )
 
     words = []
     if os.path.exists(words_file):
         with open(words_file) as f:
             for word_row in csv.DictReader(f):
-                if int(word_row["segment_id"]) == segment_id and word_row.get("language") == row.get("language"):
+                if int(word_row["segment_id"]) == segment_id and word_row.get("language") == seg.language:
                     words.append(Word(word_row["word"], float(word_row["start_time"]), float(word_row["end_time"])))
 
-    segment.words = words
+    segment = replace(seg, words=words)
 
     if debug:
-        threshold = MAX_CHARS.get(row.get("language", ""), MAX_CHARS["default"])
-        print(f"segment {segment_id}: {len(text)} chars (threshold {threshold}), {len(words)} words")
+        threshold = MAX_CHARS.get(seg.language, MAX_CHARS["default"])
+        print(f"segment {segment_id}: {len(seg.raw_text)} chars (threshold {threshold}), {len(words)} words")
         if words:
             print(f"  words: {' '.join(w.text for w in words[:10])}{'...' if len(words) > 10 else ''}")
         print()
@@ -116,7 +109,7 @@ def main():
                 cache = json.load(f)
 
         cache[str(segment_id)] = {
-            "source": text,
+            "source": seg.raw_text,
             "cues": [{"text": c.text, "start": c.start, "end": c.end} for c in cues],
         }
 

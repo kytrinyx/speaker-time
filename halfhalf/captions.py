@@ -20,15 +20,13 @@ class Captions:
         return cls(episode_id)
 
     def __iter__(self):
-        for row in self._transcript:
-            text = row["text"].strip()
-            lang = row.get("language", "")
-            sid = int(row["segment_id"])
-            if not text or text == "[TIMEOUT]" or self._transcript.low_confidence(sid, lang):
+        for seg in self._transcript:
+            text = seg.text
+            if seg.low_confidence():
                 continue
-            cached = self._split_cache.get(str(sid))
+            cached = self._split_cache.get(str(seg.id))
             if cached:
                 for c in cached["cues"]:
                     yield Cue(c["start"], c["end"], c["text"])
             else:
-                yield Cue(float(row["start_time"]), float(row["end_time"]), text)
+                yield Cue(seg.start, seg.end, text)

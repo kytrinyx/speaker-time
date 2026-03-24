@@ -1,23 +1,9 @@
 import csv
 import json
 import os
-import re
+from dataclasses import replace
 
-from .corrections import apply as apply_corrections
-
-
-def _is_filler(text, lang):
-    if lang == "ko":
-        return bool(re.fullmatch(r'[\u3130-\u318F아어고으\s]+', text))
-    return bool(re.fullmatch(r'[hH][aAeE]+([hH][aAeE]*)*[\s!.]*', text))
-
-
-def _collapse_korean(text):
-    return re.sub(r'([\uAC00-\uD7A3])\1{4,}', r'\1\1\1', text)
-
-
-def _collapse_m(text):
-    return re.sub(r'[Mm]{3,}', 'Mmm', text)
+from .segment import Segment
 
 FIELDNAMES = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
 
@@ -85,14 +71,8 @@ class Transcript:
             if segment_id not in by_segment or float(row['confidence']) > float(by_segment[segment_id]['confidence']):
                 by_segment[segment_id] = row
         for segment_id in sorted(by_segment):
-            row = dict(by_segment[segment_id])
-            row['text'] = apply_corrections(row['text'])
+            seg = Segment.from_dict(by_segment[segment_id])
             if segment_id in self._intro_outro_corrections:
-                row['text'] = self._intro_outro_corrections[segment_id]
-            lang = row.get('language', '')
-            if lang == 'ko':
-                row['text'] = _collapse_korean(row['text'])
-            row['text'] = _collapse_m(row['text'])
-            if _is_filler(row['text'].strip(), lang):
-                continue
-            yield row
+                seg = replace(seg, raw_text=self._intro_outro_corrections[segment_id])
+            if seg.text:
+                yield seg

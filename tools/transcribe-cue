@@ -81,7 +81,7 @@ def main():
 
     print(f"Retranscribing segment {segment_id:06d} ({speaker_id}, {language})...")
 
-    before_text = next((row['text'] for row in transcript if int(row['segment_id']) == segment_id), None)
+    before_text = next((seg.text for seg in transcript if seg.id == segment_id), None)
     all_rows, all_words = transcriber.transcribe_segment(
         audio_file, segment_id, speaker_id, language, start_time, end_time
     )
@@ -92,7 +92,7 @@ def main():
 
     print(f"Updated transcription.csv")
 
-    after_text = next((row['text'] for row in transcript if int(row['segment_id']) == segment_id), None)
+    after_text = next((seg.text for seg in transcript if seg.id == segment_id), None)
     timestamp = datetime.datetime.now().isoformat(timespec='seconds')
     with open(log_file, 'a') as f:
         f.write(f"[{timestamp}] segment {segment_id:06d}\n")

@@ -4,9 +4,11 @@ import sys
 import os
 import csv
 import json
+from dataclasses import replace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from halfhalf.segment_splitter import Word, TranscriptionSegment, HybridSplit
+from halfhalf.word import Word
+from halfhalf.segment_splitter import HybridSplit
 from halfhalf.transcript import Transcript
 
 
@@ -42,24 +44,10 @@ def main():
 
     transcript = Transcript.load(episode_id)
     segments = []
-    for row in transcript:
-        text = row["text"].strip()
-        lang = row.get("language", "")
-        if not text or text == "[TIMEOUT]":
+    for seg in transcript:
+        if (seg.id, seg.language) not in words_by_segment:
             continue
-        sid = int(row["segment_id"])
-        if (sid, lang) not in words_by_segment:
-            continue
-        seg = TranscriptionSegment(
-            id=sid,
-            start=float(row["start_time"]),
-            end=float(row["end_time"]),
-            text=text,
-            language=lang,
-            words=words_by_segment[(sid, lang)],
-        )
-        if not seg.is_filler():
-            segments.append(seg)
+        segments.append(replace(seg, words=words_by_segment[(seg.id, seg.language)]))
 
     splitter = HybridSplit(episode_id=episode_id)
     split_count = 0
@@ -67,14 +55,14 @@ def main():
 
     for seg in segments:
         key = str(seg.id)
-        if key in cache and cache[key]["source"] == seg.text:
+        if key in cache and cache[key]["source"] == seg.raw_text:
             skip_count += 1
             continue
 
         cues = splitter.split(seg)
         if len(cues) > 1:
             cache[key] = {
-                "source": seg.text,
+                "source": seg.raw_text,
                 "cues": [{"text": c.text, "start": c.start, "end": c.end} for c in cues],
             }
             split_count += 1

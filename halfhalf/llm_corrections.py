@@ -9,10 +9,10 @@ CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 
 def get_intro_rows(segments):
     rows = []
-    for row in segments:
-        if row["language"] == "en":
+    for seg in segments:
+        if seg.language == "en":
             break
-        rows.append(row)
+        rows.append(seg)
         if len(rows) >= INTRO_KO_LINES:
             break
     return rows
@@ -20,13 +20,13 @@ def get_intro_rows(segments):
 
 def get_outro_rows(segments, language):
     tail = segments[-OUTRO_LINES:]
-    rows = [r for r in tail if r["language"] == language]
+    rows = [s for s in tail if s.language == language]
     n = OUTRO_KO_LINES if language == "ko" else OUTRO_EN_LINES
     return rows[-n:]
 
 
 def claude_correct(rows, cohost, client):
-    payload = [{"segment_id": int(r["segment_id"]), "language": r["language"], "text": r["text"].strip()} for r in rows]
+    payload = [{"segment_id": seg.id, "language": seg.language, "text": seg.text} for seg in rows]
     response = client.messages.create(
         model=CLAUDE_MODEL,
         max_tokens=1024,
@@ -52,13 +52,13 @@ def claude_correct(rows, cohost, client):
 def generate_corrections(episode_id, cohost, client):
     from .transcript import Transcript
     transcript = Transcript.load(episode_id)
-    segments = [row for row in transcript if row["text"].strip()]
+    segments = list(transcript)
 
     corrections = {}
     for rows in [get_intro_rows(segments), get_outro_rows(segments, "ko"), get_outro_rows(segments, "en")]:
         if not rows:
             continue
-        originals = {int(r["segment_id"]): r["text"].strip() for r in rows}
+        originals = {seg.id: seg.text for seg in rows}
         result = claude_correct(rows, cohost, client)
         for seg_id, corrected in result.items():
             if corrected != originals.get(int(seg_id)):

@@ -1,33 +1,12 @@
 import os
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .cue import Cue
+from .segment import Segment, clean
 
 MAX_CHARS = {"ko": 45, "default": 80}
-
-
-@dataclass
-class Word:
-    text: str
-    start: float
-    end: float
-
-
-@dataclass
-class TranscriptionSegment:
-    id: int
-    start: float
-    end: float
-    text: str
-    language: str
-    words: list = field(default_factory=list)
-
-    def is_filler(self):
-        if self.language == "ko":
-            return bool(re.fullmatch(r'[ㅋㅎ아어고으\s]+', self.text))
-        return bool(re.fullmatch(r'[hH][aAeE]+([hH][aAeE]*)*[\s!.]*', self.text))
 
 
 def normalize(s):
@@ -41,30 +20,8 @@ def split_text_at_punctuation(text):
     return [p.strip() for p in parts if p.strip()]
 
 
-def words_to_cue(words, fallback_start, fallback_end):
-    text = "".join(w.text for w in words).strip()
-    start = words[0].start if words else fallback_start
-    end = words[-1].end if words else fallback_end
-    return Cue(start, end, text)
-
-
-def merge_short_cues(cues, threshold):
-    """Merge adjacent cues if their combined length fits within the threshold."""
-    if not cues:
-        return cues
-    result = [cues[0]]
-    for cue in cues[1:]:
-        prev = result[-1]
-        merged_text = prev.text + " " + cue.text
-        if len(merged_text) <= threshold:
-            result[-1] = Cue(prev.start, cue.end, merged_text)
-        else:
-            result.append(cue)
-    return result
-
-
 class PunctuationSplit:
-    """Split at sentence-ending punctuation (. ? !), using segment.text as the authoritative boundary source."""
+    """Split at sentence-ending punctuation (. ? !), using segment.raw_text as the authoritative boundary source."""
 
     name = "punctuation"
 
@@ -73,13 +30,13 @@ class PunctuationSplit:
 
     def split(self, segment):
         threshold = self.max_chars_by_lang.get(segment.language, self.max_chars_by_lang["default"])
-        if len(segment.text) <= threshold:
+        if len(segment.raw_text) <= threshold:
             return [Cue(segment.start, segment.end, segment.text)]
 
         if not segment.words:
             return [Cue(segment.start, segment.end, segment.text)]
 
-        chunks = split_text_at_punctuation(segment.text)
+        chunks = split_text_at_punctuation(segment.raw_text)
         if len(chunks) <= 1:
             return [Cue(segment.start, segment.end, segment.text)]
 
@@ -110,7 +67,9 @@ class PunctuationSplit:
                 char_pos = w_end
 
             if chunk_words:
-                cues.append(words_to_cue(chunk_words, segment.start, segment.end))
+                cleaned = clean(chunk, segment.language)
+                if cleaned:
+                    cues.append(Cue(chunk_words[0].start, chunk_words[-1].end, cleaned))
             cursor = end_pos
 
         if not cues:
@@ -145,7 +104,7 @@ class OllamaSplit:
 
         import urllib.request, json
 
-        source = segment.text
+        source = segment.raw_text
         if source in self._cache:
             split_points = self._cache[source]
         else:
@@ -193,9 +152,27 @@ class OllamaSplit:
         for start, end in zip(boundaries, boundaries[1:]):
             chunk = segment.words[start:end]
             if chunk:
-                cues.append(words_to_cue(chunk, segment.start, segment.end))
+                text = "".join(w.text for w in chunk).strip()
+                cleaned = clean(text, segment.language)
+                if cleaned:
+                    cues.append(Cue(chunk[0].start, chunk[-1].end, cleaned))
 
         return cues if cues else [Cue(segment.start, segment.end, segment.text)]
+
+
+def merge_short_cues(cues, threshold):
+    """Merge adjacent cues if their combined length fits within the threshold."""
+    if not cues:
+        return cues
+    result = [cues[0]]
+    for cue in cues[1:]:
+        prev = result[-1]
+        merged_text = prev.text + " " + cue.text
+        if len(merged_text) <= threshold:
+            result[-1] = Cue(prev.start, cue.end, merged_text)
+        else:
+            result.append(cue)
+    return result
 
 
 class HybridSplit:
@@ -220,12 +197,17 @@ class HybridSplit:
             if len(cue.text) > threshold:
                 cue_words = [w for w in segment.words
                              if w.end > cue.start and w.start < cue.end]
-                mini = TranscriptionSegment(segment.id, cue.start, cue.end, cue.text,
-                               segment.language, cue_words)
+                mini = Segment(
+                    id=segment.id,
+                    start=cue.start,
+                    end=cue.end,
+                    raw_text=cue.text,
+                    language=segment.language,
+                    words=cue_words,
+                )
                 sub_cues = self._ollama.split(mini)
                 expanded.extend(merge_short_cues(sub_cues, threshold))
             else:
                 expanded.append(cue)
 
         return expanded
-

@@ -18,7 +18,9 @@ from halfhalf.transcript import Transcript
 from halfhalf.prompts import build_prompts, cohost_for
 from halfhalf.transcriber import Transcriber
 from halfhalf.words import Words
-from halfhalf.segment_splitter import Word, TranscriptionSegment, HybridSplit, MAX_CHARS
+from halfhalf.word import Word
+from halfhalf.segment_splitter import HybridSplit, MAX_CHARS
+from dataclasses import replace
 from halfhalf.llm_corrections import generate_corrections, get_intro_rows, get_outro_rows
 
 
@@ -74,19 +76,14 @@ def main():
                 queued_ids.add(segment_id)
 
     # Also retranscribe long segments that have no word-level data (can't be split without it)
-    for row in transcript:
-        text = row["text"].strip()
-        if not text or text == "[TIMEOUT]":
+    for seg in transcript:
+        if seg.id in queued_ids:
             continue
-        sid = int(row["segment_id"])
-        if sid in queued_ids:
-            continue
-        lang = row.get("language", "")
-        threshold = MAX_CHARS.get(lang, MAX_CHARS["default"])
-        if len(text) > threshold and (sid, lang) not in words_by_segment:
-            if sid in timeline_by_segment:
-                segments.append((sid, *timeline_by_segment[sid]))
-                queued_ids.add(sid)
+        threshold = MAX_CHARS.get(seg.language, MAX_CHARS["default"])
+        if len(seg.raw_text) > threshold and (seg.id, seg.language) not in words_by_segment:
+            if seg.id in timeline_by_segment:
+                segments.append((seg.id, *timeline_by_segment[seg.id]))
+                queued_ids.add(seg.id)
 
     if not segments:
         print("No segments need transcription.")
@@ -128,8 +125,8 @@ def main():
 
     corrections_path = transcript.corrections_path
     retranscribed_ids = {seg_id for seg_id, *_ in segments}
-    all_segments = [row for row in Transcript.load(episode_id) if row["text"].strip()]
-    intro_outro_ids = {int(r["segment_id"]) for r in get_intro_rows(all_segments) + get_outro_rows(all_segments)}
+    all_segments = list(Transcript.load(episode_id))
+    intro_outro_ids = {s.id for s in get_intro_rows(all_segments) + get_outro_rows(all_segments, "ko") + get_outro_rows(all_segments, "en")}
     needs_corrections = not os.path.exists(corrections_path) or bool(retranscribed_ids & intro_outro_ids)
     if needs_corrections:
         if os.path.exists(corrections_path):
@@ -162,41 +159,28 @@ def main():
     split_count = 0
     skip_count = 0
 
-    for row in transcript:
-        text = row["text"].strip()
-        lang = row.get("language", "")
-        if not text or text == "[TIMEOUT]":
+    for seg in transcript:
+        if (seg.id, seg.language) not in words_by_segment:
+            threshold = MAX_CHARS.get(seg.language, MAX_CHARS["default"])
+            if len(seg.raw_text) > threshold:
+                print(f"  [no words] segment {seg.id:06d}: {seg.raw_text[:60]!r}...")
             continue
-        sid = int(row["segment_id"])
-        threshold = MAX_CHARS.get(lang, MAX_CHARS["default"])
-        if (sid, lang) not in words_by_segment:
-            if len(text) > threshold:
-                print(f"  [no words] segment {sid:06d}: {text[:60]!r}...")
-            continue
-        seg = TranscriptionSegment(
-            id=sid,
-            start=float(row["start_time"]),
-            end=float(row["end_time"]),
-            text=text,
-            language=lang,
-            words=words_by_segment[(sid, lang)],
-        )
-        if seg.is_filler():
-            continue
-        key = str(sid)
-        if key in cache and cache[key]["source"] == text:
+        ts = replace(seg, words=words_by_segment[(seg.id, seg.language)])
+        key = str(seg.id)
+        if key in cache and cache[key]["source"] == seg.raw_text:
             skip_count += 1
             continue
-        cues = splitter.split(seg)
+        cues = splitter.split(ts)
         if len(cues) > 1:
             cache[key] = {
-                "source": text,
+                "source": seg.raw_text,
                 "cues": [{"text": c.text, "start": c.start, "end": c.end} for c in cues],
             }
             split_count += 1
         else:
-            if len(text) > threshold:
-                print(f"  [unsplittable] segment {sid:06d}: {text[:60]!r}...")
+            threshold = MAX_CHARS.get(seg.language, MAX_CHARS["default"])
+            if len(seg.raw_text) > threshold:
+                print(f"  [unsplittable] segment {seg.id:06d}: {seg.raw_text[:60]!r}...")
             if key in cache:
                 del cache[key]
 
