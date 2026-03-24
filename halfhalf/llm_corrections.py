@@ -2,6 +2,8 @@ import json
 
 INTRO_KO_LINES = 5
 OUTRO_LINES = 15
+OUTRO_KO_LINES = 5
+OUTRO_EN_LINES = 5
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 
 
@@ -16,8 +18,11 @@ def get_intro_rows(segments):
     return rows
 
 
-def get_outro_rows(segments):
-    return segments[-OUTRO_LINES:]
+def get_outro_rows(segments, language):
+    tail = segments[-OUTRO_LINES:]
+    rows = [r for r in tail if r["language"] == language]
+    n = OUTRO_KO_LINES if language == "ko" else OUTRO_EN_LINES
+    return rows[-n:]
 
 
 def claude_correct(rows, cohost, client):
@@ -50,7 +55,7 @@ def generate_corrections(episode_id, cohost, client):
     segments = [row for row in transcript if row["text"].strip()]
 
     corrections = {}
-    for rows in [get_intro_rows(segments), get_outro_rows(segments)]:
+    for rows in [get_intro_rows(segments), get_outro_rows(segments, "ko"), get_outro_rows(segments, "en")]:
         if not rows:
             continue
         originals = {int(r["segment_id"]): r["text"].strip() for r in rows}
