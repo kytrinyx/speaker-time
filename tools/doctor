@@ -18,7 +18,7 @@ from halfhalf.transcript import Transcript
 from halfhalf.prompts import build_prompts, cohost_for
 from halfhalf.transcriber import Transcriber
 from halfhalf.words import Words
-from halfhalf.segment_splitter import Word, TranscriptionSegment, HybridSplit
+from halfhalf.segment_splitter import Word, TranscriptionSegment, HybridSplit, MAX_CHARS
 from halfhalf.llm_corrections import generate_corrections, get_intro_rows, get_outro_rows
 
 
@@ -45,16 +45,45 @@ def main():
         with open(metadata_file) as f:
             metadata = json.load(f)
 
+    words_by_segment = {}
+    if os.path.exists(words_file):
+        with open(words_file) as f:
+            for row in csv.DictReader(f):
+                sid = int(row["segment_id"])
+                lang = row.get("language", "")
+                words_by_segment.setdefault((sid, lang), []).append(
+                    Word(row["word"], float(row["start_time"]), float(row["end_time"]))
+                )
+
     # Find all segments that need transcription
     segments = []  # list of (segment_id, speaker_id, language, start_time, end_time, audio_file)
+    queued_ids = set()
+    timeline_by_segment = {}
     with open(timeline_file) as f:
         for i, row in enumerate(csv.DictReader(f), 1):
             segment_id = int(row.get('segment_id', i))
             speaker_id = row['SPEAKER_ID']
             language = metadata.get(speaker_id, {}).get('language', 'en')
-            if transcript.needs_transcription(segment_id, language):
-                audio_file = os.path.join(output_dir, "audio", f"{segment_id:06d}.mp3")
+            audio_file = os.path.join(output_dir, "audio", f"{segment_id:06d}.mp3")
+            timeline_by_segment[segment_id] = (speaker_id, language, float(row['start_time']), float(row['end_time']), audio_file)
+            if transcriber.needs_transcription(segment_id, language):
                 segments.append((segment_id, speaker_id, language, float(row['start_time']), float(row['end_time']), audio_file))
+                queued_ids.add(segment_id)
+
+    # Also retranscribe long segments that have no word-level data (can't be split without it)
+    for row in transcript:
+        text = row["text"].strip()
+        if not text or text == "[TIMEOUT]":
+            continue
+        sid = int(row["segment_id"])
+        if sid in queued_ids:
+            continue
+        lang = row.get("language", "")
+        threshold = MAX_CHARS.get(lang, MAX_CHARS["default"])
+        if len(text) > threshold and (sid, lang) not in words_by_segment:
+            if sid in timeline_by_segment:
+                segments.append((sid, *timeline_by_segment[sid]))
+                queued_ids.add(sid)
 
     if not segments:
         print("No segments need transcription.")
@@ -71,9 +100,8 @@ def main():
             shutil.copy2(words_file, words_backup)
             print(f"Backed up words.csv to {os.path.basename(words_backup)}")
 
-        transcriber = Transcriber(build_prompts(episode_id))
-
         words_csv = Words.load(words_file)
+        transcriber = Transcriber(build_prompts(episode_id), transcript, words_csv)
 
         for segment_id, speaker_id, language, start_time, end_time, audio_file in segments:
             if not os.path.exists(audio_file):
@@ -119,6 +147,7 @@ def main():
         with open(cache_file) as f:
             cache = json.load(f)
 
+    # Reload words after any retranscription
     words_by_segment = {}
     if os.path.exists(words_file):
         with open(words_file) as f:

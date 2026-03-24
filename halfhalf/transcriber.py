@@ -2,13 +2,28 @@ import signal
 import whisper
 import torch
 
+from .segment_splitter import MAX_CHARS
+
 
 class Transcriber:
-    def __init__(self, prompts):
+    def __init__(self, prompts, transcript, words):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         self.use_fp16 = device == "cuda"
         self.model = whisper.load_model("small", device=device)
         self.prompts = prompts
+        self.transcript = transcript
+        self.words = words
+
+    def needs_transcription(self, segment_id, language):
+        if self.transcript.needs_transcription(segment_id, language):
+            return True
+        row = self.transcript.get(segment_id, language)
+        if row:
+            text = row['text'].strip()
+            threshold = MAX_CHARS.get(language, MAX_CHARS['default'])
+            if len(text) > threshold and not self.words.has_words(segment_id, language):
+                return True
+        return False
 
     def transcribe_segment(self, audio_file, segment_id, speaker_id, language, start_time, end_time):
         """Transcribe a segment, with alt-language fallback if low confidence.

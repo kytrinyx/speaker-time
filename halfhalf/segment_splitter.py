@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 
 from .cue import Cue
 
+MAX_CHARS = {"ko": 45, "default": 80}
+
 
 @dataclass
 class Word:
@@ -155,7 +157,7 @@ class HybridSplit:
     """Punctuation split first; ollama sub-splits cues that are still too long; merge short fragments."""
 
     def __init__(self, max_chars_by_lang=None, min_chars=20, model="exaone3.5:latest"):
-        self.max_chars_by_lang = max_chars_by_lang if max_chars_by_lang is not None else {"ko": 45, "default": 80}
+        self.max_chars_by_lang = max_chars_by_lang if max_chars_by_lang is not None else MAX_CHARS
         self.min_chars = min_chars
         self._punct = PunctuationSplit()
         self._ollama = OllamaSplit(model=model)

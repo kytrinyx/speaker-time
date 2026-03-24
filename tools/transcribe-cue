@@ -72,16 +72,16 @@ def main():
             speaker_data = metadata.get(speaker_id, {})
             language = speaker_data.get("language", "en")
 
-    if not transcript.needs_transcription(segment_id, language):
-        existing_confidence = float(transcript._rows[(segment_id, language)]['confidence'])
-        print(f"Segment {segment_id:06d} ({speaker_id}, {language}) confidence is {existing_confidence:.4f} (good), skipping.")
+    words = Words.load(words_file)
+    transcriber = Transcriber(prompts, transcript, words)
+
+    if not transcriber.needs_transcription(segment_id, language):
+        print(f"Segment {segment_id:06d} ({speaker_id}, {language}) does not need transcription, skipping.")
         return
 
     print(f"Retranscribing segment {segment_id:06d} ({speaker_id}, {language})...")
 
     before_text = next((row['text'] for row in transcript if int(row['segment_id']) == segment_id), None)
-
-    transcriber = Transcriber(prompts)
     all_rows, all_words = transcriber.transcribe_segment(
         audio_file, segment_id, speaker_id, language, start_time, end_time
     )
@@ -103,7 +103,6 @@ def main():
                 f.write(f"  [{row['language']}] confidence={float(row['confidence']):.4f} text={row['text'][:80]}\n")
 
     languages = {row['language'] for row in all_rows}
-    words = Words.load(words_file)
     words.upsert_segment(segment_id, all_words, languages)
     words.save()
     print(f"Updated words.csv ({len(all_words)} word rows)")

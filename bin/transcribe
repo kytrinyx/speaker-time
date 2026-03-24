@@ -37,8 +37,6 @@ def main():
 
     print("Transcribing audio segments...")
 
-    transcriber = Transcriber(prompts)
-
     # Load metadata for language hints and skip flags
     speaker_languages = {}
     speaker_skip = {}
@@ -59,6 +57,7 @@ def main():
     words_file = os.path.join(output_dir, "words.csv")
     transcript = Transcript.load(episode_id)
     words_csv = Words.load(words_file)
+    transcriber = Transcriber(prompts, transcript, words_csv)
 
     # Transcribe each audio segment
     transcribed_count = 0
@@ -69,7 +68,7 @@ def main():
             continue
         language = speaker_languages.get(speaker_id, "en")
 
-        if not transcript.needs_transcription(i, language):
+        if not transcriber.needs_transcription(i, language):
             continue
 
         segment_file = os.path.join(audio_dir, f"{i:06d}.mp3")

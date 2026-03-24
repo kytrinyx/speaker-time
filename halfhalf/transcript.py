@@ -33,6 +33,9 @@ class Transcript:
     def corrections_path(self):
         return self._corrections_path
 
+    def get(self, segment_id, language):
+        return self._rows.get((segment_id, language))
+
     def contains(self, segment_id, language):
         return (segment_id, language) in self._rows
 
