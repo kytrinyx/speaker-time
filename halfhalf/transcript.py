@@ -43,7 +43,10 @@ class Transcript:
         return float(row['confidence']) < -1.5
 
     def low_confidence(self, segment_id, language):
-        return self.needs_transcription(segment_id, language)
+        row = self._rows.get((segment_id, language))
+        if row is None:
+            return False
+        return float(row['confidence']) < -1.5
 
     def upsert(self, row):
         key = (int(row['segment_id']), row['language'])
