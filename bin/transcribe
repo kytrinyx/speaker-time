@@ -2,13 +2,15 @@
 
 import sys
 import os
-import csv
 import json
+import shutil
+import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from halfhalf.transcript import Transcript
 from halfhalf.prompts import build_prompts
 from halfhalf.transcriber import Transcriber
 from halfhalf.words import Words
+from halfhalf.timeline import Timeline
 
 
 def main():
@@ -24,7 +26,6 @@ def main():
     metadata_file = os.path.join(output_dir, "metadata.json")
     audio_dir = os.path.join(output_dir, "audio")
 
-    # Check if required files exist
     if not os.path.exists(timeline_file):
         print(f"Error: Timeline CSV not found: {timeline_file}")
         print("Run 'diarize' first to generate the timeline.")
@@ -35,9 +36,6 @@ def main():
         print("Run 'cut-audio' first to generate audio segments.")
         sys.exit(1)
 
-    print("Transcribing audio segments...")
-
-    # Load metadata for language hints and skip flags
     speaker_languages = {}
     speaker_skip = {}
     if os.path.exists(metadata_file):
@@ -49,44 +47,46 @@ def main():
                 speaker_languages[speaker] = data.get("language", "en")
                 speaker_skip[speaker] = data.get("skip", False)
 
-    # Load timeline data
-    timeline_data = []
-    with open(timeline_file, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            timeline_data.append(row)
-
+    timeline = Timeline.load(episode_id)
     words_file = os.path.join(output_dir, "words.csv")
     transcript = Transcript.load(episode_id)
     words_csv = Words.load(words_file)
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    if os.path.exists(transcript.path):
+        backup = os.path.join(output_dir, f"bk.{timestamp}.transcription.csv")
+        shutil.copy2(transcript.path, backup)
+        print(f"Backed up transcription.csv to {os.path.basename(backup)}")
+    if os.path.exists(words_file):
+        backup = os.path.join(output_dir, f"bk.{timestamp}.words.csv")
+        shutil.copy2(words_file, backup)
+        print(f"Backed up words.csv to {os.path.basename(backup)}")
+
     transcriber = Transcriber(prompts, transcript, words_csv)
 
-    # Transcribe each audio segment
+    print("Transcribing audio segments...")
     transcribed_count = 0
 
-    for i, timeline_row in enumerate(timeline_data, 1):
-        speaker_id = timeline_row['SPEAKER_ID']
-        if speaker_skip.get(speaker_id, False):
+    for seg in timeline:
+        if speaker_skip.get(seg.speaker_id, False):
             continue
-        language = speaker_languages.get(speaker_id, "en")
+        language = speaker_languages.get(seg.speaker_id, "en")
 
-        if not transcriber.needs_transcription(i, language):
-            continue
-
-        segment_file = os.path.join(audio_dir, f"{i:06d}.mp3")
-
-        if not os.path.exists(segment_file):
-            print(f"Warning: Audio segment {segment_file} not found")
+        if not transcriber.needs_transcription(seg.segment_id, language):
             continue
 
-        print(f"Transcribing segment {i:06d} ({speaker_id})...")
+        if not os.path.exists(seg.audio_path):
+            print(f"Warning: Audio segment {seg.audio_path} not found")
+            continue
+
+        print(f"Transcribing segment {seg.segment_id:06d} ({seg.speaker_id})...")
         try:
             rows, words = transcriber.transcribe_segment(
-                segment_file, i, speaker_id, language,
-                timeline_row['start_time'], timeline_row['end_time'],
+                seg.audio_path, seg.segment_id, seg.speaker_id, language,
+                seg.start, seg.end,
             )
         except Exception as e:
-            print(f"Error transcribing segment {i:06d}: {e}")
+            print(f"Error transcribing segment {seg.segment_id:06d}: {e}")
             continue
 
         for row in rows:
@@ -94,7 +94,7 @@ def main():
         transcript.save()
 
         languages = {row['language'] for row in rows}
-        words_csv.upsert_segment(i, words, languages)
+        words_csv.upsert_segment(seg.segment_id, words, languages)
         words_csv.save()
 
         transcribed_count += 1

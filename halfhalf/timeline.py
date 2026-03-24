@@ -36,6 +36,9 @@ class Timeline:
                 ))
         return cls(segments)
 
+    def __iter__(self):
+        return iter(self._segments)
+
     def net_duration(self):
         return sum(s.duration for s in self._segments)
 
