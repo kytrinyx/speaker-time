@@ -72,11 +72,14 @@ def main():
             continue
 
         cues = splitter.split(seg)
-        cache[key] = {
-            "source": seg.text,
-            "cues": [{"text": c.text, "start": c.start, "end": c.end} for c in cues],
-        }
-        split_count += 1
+        if len(cues) > 1:
+            cache[key] = {
+                "source": seg.text,
+                "cues": [{"text": c.text, "start": c.start, "end": c.end} for c in cues],
+            }
+            split_count += 1
+        elif key in cache:
+            del cache[key]
 
     with open(cache_file, "w") as f:
         json.dump(cache, f, ensure_ascii=False, indent=2)

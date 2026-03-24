@@ -35,9 +35,9 @@ def normalize(s):
 
 
 def split_text_at_punctuation(text):
-    """Split text at sentence boundaries (.?!), treating ... as a single unit."""
-    chunks = re.findall(r'[^.?!]+(?:[.?!]+|$)', text.strip())
-    return [c.strip() for c in chunks if c.strip()]
+    """Split text at sentence boundaries - punctuation followed by whitespace or end of string."""
+    parts = re.split(r'(?<=[.?!])(?=\s|$)', text.strip())
+    return [p.strip() for p in parts if p.strip()]
 
 
 def words_to_cue(words, fallback_start, fallback_end):
@@ -47,12 +47,34 @@ def words_to_cue(words, fallback_start, fallback_end):
     return Cue(start, end, text)
 
 
+def merge_short_cues(cues, threshold):
+    """Merge adjacent cues if their combined length fits within the threshold."""
+    if not cues:
+        return cues
+    result = [cues[0]]
+    for cue in cues[1:]:
+        prev = result[-1]
+        merged_text = prev.text + " " + cue.text
+        if len(merged_text) <= threshold:
+            result[-1] = Cue(prev.start, cue.end, merged_text)
+        else:
+            result.append(cue)
+    return result
+
+
 class PunctuationSplit:
     """Split at sentence-ending punctuation (. ? !), using segment.text as the authoritative boundary source."""
 
     name = "punctuation"
 
+    def __init__(self, max_chars_by_lang=None):
+        self.max_chars_by_lang = max_chars_by_lang if max_chars_by_lang is not None else MAX_CHARS
+
     def split(self, segment):
+        threshold = self.max_chars_by_lang.get(segment.language, self.max_chars_by_lang["default"])
+        if len(segment.text) <= threshold:
+            return [Cue(segment.start, segment.end, segment.text)]
+
         if not segment.words:
             return [Cue(segment.start, segment.end, segment.text)]
 
@@ -90,7 +112,9 @@ class PunctuationSplit:
                 cues.append(words_to_cue(chunk_words, segment.start, segment.end))
             cursor = end_pos
 
-        return cues if cues else [Cue(segment.start, segment.end, segment.text)]
+        if not cues:
+            return [Cue(segment.start, segment.end, segment.text)]
+        return merge_short_cues(cues, threshold)
 
 
 class OllamaSplit:
@@ -156,10 +180,9 @@ class OllamaSplit:
 class HybridSplit:
     """Punctuation split first; ollama sub-splits cues that are still too long; merge short fragments."""
 
-    def __init__(self, max_chars_by_lang=None, min_chars=20, model="exaone3.5:latest"):
+    def __init__(self, max_chars_by_lang=None, model="exaone3.5:latest"):
         self.max_chars_by_lang = max_chars_by_lang if max_chars_by_lang is not None else MAX_CHARS
-        self.min_chars = min_chars
-        self._punct = PunctuationSplit()
+        self._punct = PunctuationSplit(max_chars_by_lang=self.max_chars_by_lang)
         self._ollama = OllamaSplit(model=model)
         parts = ", ".join(f"{k}={v}" for k, v in self.max_chars_by_lang.items())
         self.name = f"hybrid({parts})"
@@ -177,24 +200,9 @@ class HybridSplit:
                 mini = TranscriptionSegment(segment.id, cue.start, cue.end, cue.text,
                                segment.language, cue_words)
                 sub_cues = self._ollama.split(mini)
-                expanded.extend(self._merge_short(sub_cues))
+                expanded.extend(merge_short_cues(sub_cues, threshold))
             else:
                 expanded.append(cue)
 
         return expanded
 
-    def _merge_short(self, cues):
-        if not cues:
-            return cues
-        result = [cues[0]]
-        for cue in cues[1:]:
-            prev = result[-1]
-            if len(prev.text) < self.min_chars:
-                result[-1] = Cue(prev.start, cue.end, prev.text + " " + cue.text)
-            else:
-                result.append(cue)
-        # merge trailing short cue back into predecessor
-        if len(result) > 1 and len(result[-1].text) < self.min_chars:
-            last = result.pop()
-            result[-1] = Cue(result[-1].start, last.end, result[-1].text + " " + last.text)
-        return result
