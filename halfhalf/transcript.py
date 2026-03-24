@@ -1,8 +1,19 @@
 import csv
 import json
 import os
+import re
 
 from .corrections import apply as apply_corrections
+
+
+def _is_filler(text, lang):
+    if lang == "ko":
+        return bool(re.fullmatch(r'[\u3130-\u318F아어고으\s]+', text))
+    return bool(re.fullmatch(r'[hH][aAeE]+([hH][aAeE]*)*[\s!.]*', text))
+
+
+def _collapse_korean(text):
+    return re.sub(r'([\uAC00-\uD7A3])\1{4,}', r'\1\1\1', text)
 
 FIELDNAMES = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
 
@@ -74,4 +85,9 @@ class Transcript:
             row['text'] = apply_corrections(row['text'])
             if segment_id in self._intro_outro_corrections:
                 row['text'] = self._intro_outro_corrections[segment_id]
+            lang = row.get('language', '')
+            if lang == 'ko':
+                row['text'] = _collapse_korean(row['text'])
+            if _is_filler(row['text'].strip(), lang):
+                continue
             yield row

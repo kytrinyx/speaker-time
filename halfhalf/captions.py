@@ -1,19 +1,8 @@
 import json
 import os
-import re
 
 from .cue import Cue
 from .transcript import Transcript
-
-
-def _is_filler(text, lang):
-    if lang == "ko":
-        return bool(re.fullmatch(r'[\u3130-\u318F아어고으\s]+', text))
-    return bool(re.fullmatch(r'[hH][aAeE]+([hH][aAeE]*)*[\s!.]*', text))
-
-
-def _collapse_korean(text):
-    return re.sub(r'([\uAC00-\uD7A3])\1{4,}', r'\1\1\1', text)
 
 
 class Captions:
@@ -34,10 +23,8 @@ class Captions:
         for row in self._transcript:
             text = row["text"].strip()
             lang = row.get("language", "")
-            if lang == "ko":
-                text = _collapse_korean(text)
             sid = int(row["segment_id"])
-            if not text or text == "[TIMEOUT]" or _is_filler(text, lang) or self._transcript.low_confidence(sid, lang):
+            if not text or text == "[TIMEOUT]" or self._transcript.low_confidence(sid, lang):
                 continue
             cached = self._split_cache.get(str(sid))
             if cached:
