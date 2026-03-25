@@ -114,6 +114,7 @@ def main():
             "cues": [{"text": c.text, "start": c.start, "end": c.end} for c in cues],
         }
 
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
         with open(cache_file, "w") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
 
