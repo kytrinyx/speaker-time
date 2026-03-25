@@ -53,14 +53,17 @@ def main():
     words_csv = Words.load(paths.words_csv(episode_id))
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    backups_dir = paths.backups_dir(episode_id)
+    if os.path.exists(transcript.path) or os.path.exists(words_csv.path):
+        os.makedirs(backups_dir, exist_ok=True)
     if os.path.exists(transcript.path):
-        backup = os.path.join(output_dir, f"bk.{timestamp}.transcription.csv")
+        backup = os.path.join(backups_dir, f"bk.{timestamp}.transcription.csv")
         shutil.copy2(transcript.path, backup)
-        print(f"Backed up transcription.csv to {os.path.basename(backup)}")
+        print(f"Backed up transcription.csv to backups/{os.path.basename(backup)}")
     if os.path.exists(words_csv.path):
-        backup = os.path.join(output_dir, f"bk.{timestamp}.words.csv")
+        backup = os.path.join(backups_dir, f"bk.{timestamp}.words.csv")
         shutil.copy2(words_csv.path, backup)
-        print(f"Backed up words.csv to {os.path.basename(backup)}")
+        print(f"Backed up words.csv to backups/{os.path.basename(backup)}")
 
     transcriber = Transcriber(prompts, transcript, words_csv)
 

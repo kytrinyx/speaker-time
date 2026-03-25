@@ -33,6 +33,10 @@ def split_segments_json(episode_id):
     return os.path.join("output", episode_id, "split_segments.json")
 
 
+def backups_dir(episode_id):
+    return os.path.join("output", episode_id, "backups")
+
+
 def audio_dir(episode_id):
     return os.path.join("output", episode_id, "audio")
 
