@@ -96,6 +96,7 @@ class OllamaSplit:
     def _save_cache(self):
         if self.cache_path:
             import json
+            os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
             with open(self.cache_path, "w") as f:
                 json.dump(self._cache, f, ensure_ascii=False, indent=2)
 

@@ -64,7 +64,7 @@ def vtt_file(episode_id, source_lang, target_lang=None):
 
 
 def ollama_cache(episode_id):
-    return os.path.join("output", episode_id, "ollama_cache.json")
+    return os.path.join("output", episode_id, "data", "ollama_cache.json")
 
 
 def translation_cache(episode_id, source_lang, target_lang):
