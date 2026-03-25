@@ -44,6 +44,7 @@ def main():
         changed = True
 
     if changed:
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
         with open(cache_path, "w") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
         total = sum(len(v["corrections"]) for v in cache.values())

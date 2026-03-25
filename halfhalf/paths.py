@@ -30,7 +30,7 @@ def words_csv(episode_id):
 
 
 def llm_corrections_cache(episode_id):
-    return os.path.join("output", episode_id, "llm_corrections_cache.json")
+    return os.path.join("output", episode_id, "data", "llm_corrections_cache.json")
 
 
 def split_segments_json(episode_id):

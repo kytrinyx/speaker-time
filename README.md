@@ -52,7 +52,8 @@ output/
     ├── data/
     │   ├── timeline.csv                  # Speaker timeline with timestamps
     │   ├── transcription.csv             # Complete transcription data
-    │   └── words.csv                     # Word-level timestamps from transcription
+    │   ├── words.csv                     # Word-level timestamps from transcription
+    │   └── llm_corrections_cache.json    # Cached Claude corrections for intro/outro
     ├── audio/                            # Individual audio segments
     │   ├── 000001.mp3
     │   ├── 000002.mp3
@@ -65,7 +66,6 @@ output/
     ├── metadata.json                     # Video info, speaker stats, and language mapping
     ├── split_segments.json               # Cached cue splits (from split-segments)
     ├── ollama_cache.json                 # Cached Ollama LLM splitting results
-    ├── llm_corrections_cache.json        # Cached Claude corrections for intro/outro
     ├── translation.ko-en.cache.json      # Cached ko->en translation chunks
     ├── translation.en-ko.cache.json      # Cached en->ko translation chunks
     └── subtitles/
@@ -124,7 +124,7 @@ Uses Claude to detect and correct transcription errors in the intro and outro se
 ```
 
 **Output:**
-- `llm_corrections_cache.json` — cached corrections keyed by sequence ID
+- `data/llm_corrections_cache.json` — cached corrections keyed by sequence ID
 
 **Requires:** `ANTHROPIC_API_KEY` environment variable.
 
