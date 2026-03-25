@@ -20,6 +20,8 @@ def main():
 
     output_dir = paths.episode_dir(episode_id)
     os.makedirs(output_dir, exist_ok=True)
+    data_dir = paths.data_dir(episode_id)
+    os.makedirs(data_dir, exist_ok=True)
     csv_filename = paths.timeline_csv(episode_id)
 
     # Check if diarization already completed

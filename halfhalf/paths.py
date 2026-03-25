@@ -5,12 +5,16 @@ def episode_dir(episode_id):
     return os.path.join("output", episode_id)
 
 
+def data_dir(episode_id):
+    return os.path.join("output", episode_id, "data")
+
+
 def audio_file(episode_id):
     return os.path.join("audio", f"{episode_id}.mp3")
 
 
 def timeline_csv(episode_id):
-    return os.path.join("output", episode_id, "timeline.csv")
+    return os.path.join("output", episode_id, "data", "timeline.csv")
 
 
 def metadata_json(episode_id):

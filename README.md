@@ -49,7 +49,8 @@ jeep-ep-004
 ```
 output/
 └── jeep-ep-001/
-    ├── timeline.csv                      # Speaker timeline with timestamps
+    ├── data/
+    │   └── timeline.csv                  # Speaker timeline with timestamps
     ├── audio/                            # Individual audio segments
     │   ├── 000001.mp3
     │   ├── 000002.mp3
@@ -303,7 +304,7 @@ Test your setup by running:
 
 ## File Formats
 
-### Timeline CSV (`timeline.csv`)
+### Timeline CSV (`data/timeline.csv`)
 ```csv
 SPEAKER_ID,start_time,end_time
 SPEAKER_00,0.008488964346349746,0.534804753820034
