@@ -2,6 +2,7 @@
 
 import sys
 import os
+import shutil
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from halfhalf.captions import Captions
@@ -18,6 +19,7 @@ def main():
     captions = Captions.load(episode_id)
     cues = list(captions)
 
+    subtitles_dir = os.environ.get("FINAL_HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
     for lang in ("ko", "en"):
         lang_cues = [c for c in cues if c.language == lang]
         vtt_file = os.path.join("output", episode_id, f"{episode_id}.{lang}-{lang}.vtt")
@@ -26,6 +28,8 @@ def main():
             for cue in lang_cues:
                 f.write(f"{cue}\n\n")
         print(f"VTT file created: {vtt_file} ({len(lang_cues)} cues)")
+        shutil.copy(vtt_file, subtitles_dir)
+        print(f"Copied {os.path.basename(vtt_file)} to {subtitles_dir}")
 
 if __name__ == "__main__":
     main()

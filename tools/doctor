@@ -2,7 +2,6 @@
 
 import sys
 import os
-import shutil
 import subprocess
 
 repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,14 +25,7 @@ def main():
     run("correct-intro-outro", episode_id)
     run("split-segments", episode_id)
     run("create-vtt", episode_id)
-
-    output_dir = os.path.join(repo_dir, "output", episode_id)
-    subtitles_dir = os.environ.get("FINAL_HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
-    for lang in ("ko", "en"):
-        src = os.path.join(output_dir, f"{episode_id}.{lang}-{lang}.vtt")
-        dst = os.path.join(subtitles_dir, f"{episode_id}.{lang}-{lang}.vtt")
-        shutil.copy2(src, dst)
-        print(f"Copied to {dst}")
+    run("translate-vtt", episode_id)
 
 
 if __name__ == "__main__":

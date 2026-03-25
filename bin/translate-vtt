@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import json
+import shutil
+import time
+import urllib.request
+import urllib.error
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from halfhalf.prompts import cohost_for
+
+
+GEMINI_API_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    "gemini-2.5-flash:generateContent?key={api_key}"
+)
+
+
+def translate_vtt(vtt_content, source_lang, target_lang, cohost):
+    api_key = os.environ.get("GEMINI_HALF_AND_HALF_API_KEY")
+    if not api_key:
+        print("Error: GEMINI_HALF_AND_HALF_API_KEY environment variable not set")
+        sys.exit(1)
+
+    if source_lang == "ko" and target_lang == "en":
+        prompt = (
+            f"This is the Half & Half podcast (하프앤하프). "
+            f"The hosts are {cohost} and 정태웅 (also called 태웅쌤).\n\n"
+            "Translate the Korean subtitle text into English. "
+            "Preserve the WEBVTT format exactly:\n"
+            "- Keep the \"WEBVTT\" header line unchanged\n"
+            "- Keep all timestamp lines (e.g. \"00:00:12.487 --> 00:00:14.287\") unchanged\n"
+            "- Keep all blank lines unchanged\n"
+            "- Only translate the text lines\n"
+            "- Do not add any explanation or commentary\n\n"
+            + vtt_content
+        )
+    else:
+        prompt = (
+            f"이것은 하프앤하프(Half & Half) 팟캐스트입니다. "
+            f"진행자는 {cohost}과 정태웅(태웅쌤)입니다.\n\n"
+            "영어 자막 텍스트를 한국어로 번역하세요. "
+            "WEBVTT 형식을 정확히 유지하세요:\n"
+            "- \"WEBVTT\" 헤더 줄은 그대로 유지\n"
+            "- 타임스탬프 줄(예: \"00:00:12.487 --> 00:00:14.287\")은 그대로 유지\n"
+            "- 빈 줄은 그대로 유지\n"
+            "- 텍스트 줄만 번역\n"
+            "- 설명이나 주석을 추가하지 마세요\n\n"
+            + vtt_content
+        )
+
+    payload = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}]
+    }).encode("utf-8")
+
+    url = GEMINI_API_URL.format(api_key=api_key)
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(req) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < 4:
+                wait = 2 ** attempt
+                print(f"Rate limited, retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                body = e.read().decode("utf-8")
+                print(f"HTTP {e.code}: {body}")
+                sys.exit(1)
+
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: translate-vtt <episode_id>")
+        print("Example: translate-vtt jeep-ep-001")
+        sys.exit(1)
+
+    episode_id = sys.argv[1]
+    output_dir = os.path.join("output", episode_id)
+    cohost = cohost_for(episode_id)
+    subtitles_dir = os.environ.get("FINAL_HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
+
+    for source_lang, target_lang in (("ko", "en"), ("en", "ko")):
+        input_file = os.path.join(output_dir, f"{episode_id}.{source_lang}-{source_lang}.vtt")
+        output_file = os.path.join(output_dir, f"{episode_id}.{source_lang}-{target_lang}.vtt")
+
+        if os.path.exists(output_file):
+            print(f"Skipping {output_file} (already exists)")
+            continue
+
+        if not os.path.exists(input_file):
+            print(f"Warning: {input_file} not found, skipping")
+            continue
+
+        with open(input_file) as f:
+            vtt_content = f.read()
+
+        print(f"Translating {input_file} -> {output_file}")
+        translated = translate_vtt(vtt_content, source_lang, target_lang, cohost)
+
+        with open(output_file, "w") as f:
+            f.write(translated)
+
+        print(f"Translation written: {output_file}")
+        shutil.copy(output_file, subtitles_dir)
+        print(f"Copied {os.path.basename(output_file)} to {subtitles_dir}")
+
+
+if __name__ == "__main__":
+    main()

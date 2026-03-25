@@ -10,6 +10,7 @@ A complete audio processing pipeline that performs speaker diarization, language
 - **Language Detection**: Automatically detects the language spoken by each speaker
 - **Transcription**: Generates full transcripts with speaker attribution
 - **VTT Subtitle Generation**: Creates WebVTT subtitle files from transcriptions
+- **Translation**: Translates Korean subtitles to English and English subtitles to Korean
 
 ## Pipeline
 
@@ -47,20 +48,25 @@ jeep-ep-004
 **Output Structure:**
 ```
 output/
-└── sample/
-    ├── timeline.csv                 # Speaker timeline with timestamps
-    ├── audio/                       # Individual audio segments
+└── jeep-ep-001/
+    ├── timeline.csv                      # Speaker timeline with timestamps
+    ├── audio/                            # Individual audio segments
     │   ├── 000001.mp3
     │   ├── 000002.mp3
     │   └── ...
-    ├── language_detection/          # Language detection samples
+    ├── language_detection/               # Language detection samples
     │   ├── SPEAKER_00_language_sample.mp3
     │   └── SPEAKER_01_language_sample.mp3
-    ├── metadata.json               # Video info (from download), speaker stats (from diarize), and language mapping (from detect-language)
-    ├── transcription.csv           # Complete transcription data
-    ├── words.csv                   # Word-level timestamps from transcription
-    ├── split_segments.json         # Cached cue splits (from split-segments)
-    └── sample.vtt                  # WebVTT subtitle file
+    ├── metadata.json                     # Video info, speaker stats, and language mapping
+    ├── transcription.csv                 # Complete transcription data
+    ├── words.csv                         # Word-level timestamps from transcription
+    ├── split_segments.json               # Cached cue splits (from split-segments)
+    ├── ollama_cache.json                 # Cached Ollama LLM splitting results
+    ├── llm_corrections_cache.json        # Cached Claude corrections for intro/outro
+    ├── jeep-ep-001.en-en.vtt             # English subtitles
+    ├── jeep-ep-001.ko-ko.vtt             # Korean subtitles
+    ├── jeep-ep-001.en-ko.vtt             # English subtitles translated to Korean
+    └── jeep-ep-001.ko-en.vtt             # Korean subtitles translated to English
 ```
 
 ### `diarize`
@@ -103,6 +109,19 @@ An `initial_prompt` is passed to Whisper for each segment to improve transcripti
 - `transcription.csv` — one or two rows per speaker segment (one per language attempted), best confidence wins downstream
 - `words.csv` — one row per word per language attempt, with absolute timestamps and probability
 
+### `correct-intro-outro`
+Uses Claude to detect and correct transcription errors in the intro and outro sequences of the episode. The intro (first few Korean segments) and outro (last segments in each language) tend to have fixed text that repeats across episodes, making them good candidates for LLM correction. Results are cached in `llm_corrections_cache.json`; sequences whose text hasn't changed since the last run are skipped. Corrections are applied by downstream steps when loading the transcript.
+
+**Usage:**
+```bash
+./bin/correct-intro-outro <episode_id>
+```
+
+**Output:**
+- `llm_corrections_cache.json` — cached corrections keyed by sequence ID
+
+**Requires:** `ANTHROPIC_API_KEY` environment variable.
+
 ### `split-segments`
 Applies `HybridSplit` to each transcription segment to produce shorter, more readable cues with accurate per-cue timestamps: first splits at sentence-ending punctuation, then uses a local Ollama model to sub-split any cue still over 80 characters. Results are cached in `split_segments.json`; segments whose source text is unchanged since the last run are skipped.
 
@@ -130,8 +149,23 @@ Converts transcription CSV to WebVTT subtitle format. Skips segments that are em
 ```
 
 **Output:**
-- Creates `output/sample/sample.vtt`
+- `{episode_id}.vtt`       — Full transcript
+- `{episode_id}.en-en.vtt` — English-only captions
+- `{episode_id}.ko-ko.vtt` — Korean-only captions
 
+### `translate-vtt`
+Translates the Korean and English subtitle files using the Gemini 2.5 Flash API. Reads `{episode_id}.ko-ko.vtt` and `{episode_id}.en-en.vtt` and produces translated counterparts. Skips files that already exist.
+
+**Usage:**
+```bash
+./bin/translate-vtt <episode_id>
+```
+
+**Output:**
+- `{episode_id}.ko-en.vtt` — Korean captions translated to English
+- `{episode_id}.en-ko.vtt` — English captions translated to Korean
+
+**Requires:** `GEMINI_HALF_AND_HALF_API_KEY` environment variable.
 
 ## Tools
 
@@ -167,7 +201,47 @@ Re-runs the cue splitting logic for a single segment and patches the VTT file in
 ./tools/split-segment sample-ep-001 42 --dry-run  # inspect proposed split
 ```
 
-**Requires:** Ollama running locally (same as `create-vtt`).
+**Requires:** Ollama running locally (same as `split-segments`).
+
+### `doctor`
+Re-runs the post-transcription pipeline steps (`transcribe`, `correct-intro-outro`, `split-segments`, `create-vtt`, `translate-vtt`) for an episode and copies all VTT files to the subtitles directory. Useful after making manual corrections to transcription data.
+
+**Usage:**
+```bash
+./tools/doctor <episode_id>
+```
+
+### `long-cues`
+Prints all cues that exceed the per-language character threshold (80 for English, 45 for Korean). Useful for identifying segments that need manual re-splitting.
+
+**Usage:**
+```bash
+./tools/long-cues <episode_id>
+```
+
+### `view-corrections`
+Displays the pending LLM corrections for an episode's intro and outro sequences — showing both the raw transcribed text and the corrected version, with a diff of each change. Useful for reviewing what `correct-intro-outro` will apply before regenerating VTT files.
+
+**Usage:**
+```bash
+./tools/view-corrections <episode_id>
+```
+
+### `extract-intro-outros`
+Extracts the intro and outro text from an episode's transcript and writes them to `intro-outro.log` in the episode's output directory. Used as input when developing or tuning the correction prompts.
+
+**Usage:**
+```bash
+./tools/extract-intro-outros <episode_id>
+```
+
+### `index`
+Prints a tab-separated list of all processed episodes and their YouTube Studio edit URLs (derived from the `youtube_video_id` in each episode's `metadata.json`). Takes no arguments.
+
+**Usage:**
+```bash
+./tools/index
+```
 
 ### `detect-language-file`
 Runs language detection on any audio file and prints the detected language and confidence score. Useful for checking individual language samples without running the full pipeline.
@@ -321,8 +395,10 @@ Segments with timeouts or errors produce no rows in this file.
 ./bin/cut-audio interview
 ./bin/detect-language interview
 ./bin/transcribe interview
+./bin/correct-intro-outro interview
 ./bin/split-segments interview
 ./bin/create-vtt interview
+./bin/translate-vtt interview
 
 ```
 
