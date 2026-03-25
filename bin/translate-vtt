@@ -47,12 +47,16 @@ def call_gemini(prompt, source_lang):
             return data["candidates"][0]["content"]["parts"][0]["text"]
         except urllib.error.HTTPError as e:
             if e.code == 429:
-                retry_after = e.headers.get("Retry-After")
-                if not retry_after:
-                    body = e.read().decode("utf-8")
-                    print(f"Rate limited with no Retry-After header: {body}")
+                body = json.loads(e.read().decode("utf-8"))
+                retry_delay = None
+                for detail in body.get("error", {}).get("details", []):
+                    if detail.get("@type") == "type.googleapis.com/google.rpc.RetryInfo":
+                        retry_delay = detail.get("retryDelay")
+                        break
+                if not retry_delay:
+                    print(f"Rate limited with no retryDelay in response: {json.dumps(body)}")
                     sys.exit(1)
-                wait = int(retry_after)
+                wait = int(retry_delay.rstrip("s"))
                 print(f"Rate limited, retrying in {wait}s...")
                 time.sleep(wait)
             else:
@@ -169,13 +173,15 @@ def main():
 
     episode_id = sys.argv[1]
     output_dir = os.path.join("output", episode_id)
+    episode_subtitles_dir = os.path.join(output_dir, "subtitles")
+    os.makedirs(episode_subtitles_dir, exist_ok=True)
     cohost = cohost_for(episode_id)
     subtitles_dir = os.environ.get("HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
 
     all_cues = list(Captions.load(episode_id))
 
     for source_lang, target_lang in (("ko", "en"), ("en", "ko")):
-        output_file = os.path.join(output_dir, f"{episode_id}.{source_lang}-{target_lang}.vtt")
+        output_file = os.path.join(episode_subtitles_dir, f"{episode_id}.{source_lang}-{target_lang}.vtt")
 
         if os.path.exists(output_file):
             print(f"Skipping {output_file} (already exists)")

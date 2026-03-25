@@ -63,10 +63,11 @@ output/
     ├── split_segments.json               # Cached cue splits (from split-segments)
     ├── ollama_cache.json                 # Cached Ollama LLM splitting results
     ├── llm_corrections_cache.json        # Cached Claude corrections for intro/outro
-    ├── jeep-ep-001.en-en.vtt             # English subtitles
-    ├── jeep-ep-001.ko-ko.vtt             # Korean subtitles
-    ├── jeep-ep-001.en-ko.vtt             # English subtitles translated to Korean
-    └── jeep-ep-001.ko-en.vtt             # Korean subtitles translated to English
+    └── subtitles/
+        ├── jeep-ep-001.en-en.vtt         # English subtitles
+        ├── jeep-ep-001.ko-ko.vtt         # Korean subtitles
+        ├── jeep-ep-001.en-ko.vtt         # English subtitles translated to Korean
+        └── jeep-ep-001.ko-en.vtt         # Korean subtitles translated to English
 ```
 
 ### `diarize`
@@ -154,7 +155,7 @@ Converts transcription CSV to WebVTT subtitle format. Skips segments that are em
 - `{episode_id}.ko-ko.vtt` — Korean-only captions
 
 ### `translate-vtt`
-Translates the Korean and English subtitle files using the Gemini 2.5 Flash API. Reads `{episode_id}.ko-ko.vtt` and `{episode_id}.en-en.vtt` and produces translated counterparts. Skips files that already exist.
+Translates the Korean and English subtitle files using the Gemini 2.5 Flash API. Produces translated counterparts in `subtitles/`. Skips files that already exist.
 
 **Usage:**
 ```bash
@@ -204,7 +205,7 @@ Re-runs the cue splitting logic for a single segment and patches the VTT file in
 **Requires:** Ollama running locally (same as `split-segments`).
 
 ### `doctor`
-Re-runs the post-transcription pipeline steps (`transcribe`, `correct-intro-outro`, `split-segments`, `create-vtt`, `translate-vtt`) for an episode and copies all VTT files to the subtitles directory. Useful after making manual corrections to transcription data.
+Re-runs the post-transcription pipeline steps (`transcribe`, `correct-intro-outro`, `split-segments`, `create-vtt`, `translate-vtt`) for an episode. Useful after making manual corrections to transcription data.
 
 **Usage:**
 ```bash
@@ -227,16 +228,8 @@ Displays the pending LLM corrections for an episode's intro and outro sequences 
 ./tools/view-corrections <episode_id>
 ```
 
-### `extract-intro-outros`
-Extracts the intro and outro text from an episode's transcript and writes them to `intro-outro.log` in the episode's output directory. Used as input when developing or tuning the correction prompts.
-
-**Usage:**
-```bash
-./tools/extract-intro-outros <episode_id>
-```
-
 ### `index`
-Prints a tab-separated list of all processed episodes and their YouTube Studio edit URLs (derived from the `youtube_video_id` in each episode's `metadata.json`). Takes no arguments.
+Prints a comma-separated list of all processed episodes and their Youtube IDs. Takes no arguments.
 
 **Usage:**
 ```bash
