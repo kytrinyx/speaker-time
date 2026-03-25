@@ -51,7 +51,8 @@ output/
 └── jeep-ep-001/
     ├── data/
     │   ├── timeline.csv                  # Speaker timeline with timestamps
-    │   └── transcription.csv             # Complete transcription data
+    │   ├── transcription.csv             # Complete transcription data
+    │   └── words.csv                     # Word-level timestamps from transcription
     ├── audio/                            # Individual audio segments
     │   ├── 000001.mp3
     │   ├── 000002.mp3
@@ -62,7 +63,6 @@ output/
     │   ├── SPEAKER_01.concatenated.mp3
     │   └── SPEAKER_01.log.json
     ├── metadata.json                     # Video info, speaker stats, and language mapping
-    ├── words.csv                         # Word-level timestamps from transcription
     ├── split_segments.json               # Cached cue splits (from split-segments)
     ├── ollama_cache.json                 # Cached Ollama LLM splitting results
     ├── llm_corrections_cache.json        # Cached Claude corrections for intro/outro
@@ -344,7 +344,7 @@ SPEAKER_02,974,3301.2,3309.8,I'm raising a daughter. When I go home...,en,-0.862
 SPEAKER_02,974,3301.2,3309.8,따로 키우고 있어서 집에 가면...,ko,-0.3500
 ```
 
-### Words CSV (`words.csv`)
+### Words CSV (`data/words.csv`)
 Word-level timestamps with absolute times (offset to match the original audio, not the segment file). Keyed by `(segment_id, language)` — when both language attempts are stored for a segment, both sets of word rows appear. Downstream steps filter by the winning language.
 
 ```csv

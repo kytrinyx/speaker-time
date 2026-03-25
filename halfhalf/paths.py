@@ -26,7 +26,7 @@ def transcription_csv(episode_id):
 
 
 def words_csv(episode_id):
-    return os.path.join("output", episode_id, "words.csv")
+    return os.path.join("output", episode_id, "data", "words.csv")
 
 
 def llm_corrections_cache(episode_id):

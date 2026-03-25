@@ -34,6 +34,7 @@ class Words:
         self._index = {(int(r['segment_id']), r['language']) for r in self._rows}
 
     def save(self):
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
         rows = sorted(self._rows, key=lambda r: (int(r['segment_id']), r.get('language', ''), int(r['word_index'])))
         with open(self.path, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
