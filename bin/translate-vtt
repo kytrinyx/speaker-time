@@ -5,6 +5,7 @@ import os
 import json
 import shutil
 import time
+import datetime
 import urllib.request
 import urllib.error
 
@@ -63,7 +64,7 @@ def call_gemini(prompt, source_lang):
 CHUNK_SIZE = 100
 
 
-def translate_chunk(lines, source_lang, target_lang, cohost):
+def translate_chunk(lines, source_lang, target_lang, cohost, output_dir):
     n = len(lines)
     numbered_text = "\n".join(f"{i+1}|{line}" for i, line in enumerate(lines))
 
@@ -114,20 +115,41 @@ def translate_chunk(lines, source_lang, target_lang, cohost):
                 translated[int(prefix)] = text
 
     if len(translated) != n:
-        print("--- Gemini response ---")
-        print(response)
-        print("--- End response ---")
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = os.path.join(output_dir, f"translation_{timestamp}.{source_lang}-{target_lang}.log")
+        with open(log_file, "w") as f:
+            f.write("=== INPUT ===\n")
+            f.write(numbered_text)
+            f.write("\n\n=== OUTPUT ===\n")
+            f.write(response)
+        print(f"Logged failure to {log_file}")
         raise ValueError(f"sent {n} lines, got back {len(translated)} translated lines")
 
     return [translated[i + 1] for i in range(n)]
 
 
-def translate_lines(lines, source_lang, target_lang, cohost):
+def translate_lines(lines, source_lang, target_lang, cohost, output_dir, cache_file):
     chunks = [lines[i:i + CHUNK_SIZE] for i in range(0, len(lines), CHUNK_SIZE)]
+
+    cache = {}
+    if os.path.exists(cache_file):
+        with open(cache_file) as f:
+            cache = json.load(f)
+
     results = []
     for idx, chunk in enumerate(chunks):
+        key = str(idx)
+        if key in cache:
+            print(f"  Chunk {idx + 1}/{len(chunks)} (cached)...")
+            results.extend(cache[key])
+            continue
         print(f"  Chunk {idx + 1}/{len(chunks)} ({len(chunk)} lines)...")
-        results.extend(translate_chunk(chunk, source_lang, target_lang, cohost))
+        translated = translate_chunk(chunk, source_lang, target_lang, cohost, output_dir)
+        cache[key] = translated
+        with open(cache_file, "w") as f:
+            json.dump(cache, f)
+        results.extend(translated)
+
     return results
 
 
@@ -162,9 +184,11 @@ def main():
         cues = [c for c in all_cues if c.language == source_lang]
         lines = [c.text for c in cues]
 
+        cache_file = os.path.join(output_dir, f"translation.{source_lang}-{target_lang}.cache.json")
+
         print(f"Translating {source_lang}->{target_lang} ({len(lines)} lines)")
         try:
-            translated = translate_lines(lines, source_lang, target_lang, cohost)
+            translated = translate_lines(lines, source_lang, target_lang, cohost, output_dir, cache_file)
         except ValueError as e:
             print(f"Error: {e}")
             sys.exit(1)
