@@ -159,7 +159,7 @@ Converts transcription CSV to WebVTT subtitle format. Skips segments that are em
 - `{episode_id}.ko-ko.vtt` — Korean-only captions
 
 ### `translate-vtt`
-Translates the Korean and English subtitle files using the Gemini 2.5 Flash API. Produces translated counterparts in `subtitles/`. Skips files that already exist.
+Translates the Korean and English subtitle files using Claude Haiku via the Replicate API. Produces translated counterparts in `subtitles/`. Skips files that already exist.
 
 **Usage:**
 ```bash
@@ -170,7 +170,7 @@ Translates the Korean and English subtitle files using the Gemini 2.5 Flash API.
 - `{episode_id}.ko-en.vtt` — Korean captions translated to English
 - `{episode_id}.en-ko.vtt` — English captions translated to Korean
 
-**Requires:** `GEMINI_HALF_AND_HALF_API_KEY_KO` and `GEMINI_HALF_AND_HALF_API_KEY_EN` environment variables.
+**Requires:** `REPLICATE_API_TOKEN` environment variable.
 
 ## Tools
 
