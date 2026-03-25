@@ -20,10 +20,11 @@ GEMINI_API_URL = (
 )
 
 
-def call_gemini(prompt):
-    api_key = os.environ.get("GEMINI_HALF_AND_HALF_API_KEY")
+def call_gemini(prompt, source_lang):
+    env_var = f"GEMINI_HALF_AND_HALF_API_KEY_{source_lang.upper()}"
+    api_key = os.environ.get(env_var)
     if not api_key:
-        print("Error: GEMINI_HALF_AND_HALF_API_KEY environment variable not set")
+        print(f"Error: {env_var} environment variable not set")
         sys.exit(1)
 
     payload = json.dumps({
@@ -94,7 +95,7 @@ def translate_chunk(lines, source_lang, target_lang, cohost):
             + numbered_text
         )
 
-    response = call_gemini(prompt)
+    response = call_gemini(prompt, source_lang)
 
     translated = {}
     for line in response.splitlines():
