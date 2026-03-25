@@ -29,12 +29,12 @@ def words_csv(episode_id):
     return os.path.join("output", episode_id, "data", "words.csv")
 
 
-def llm_corrections_cache(episode_id):
-    return os.path.join("output", episode_id, "data", "llm_corrections_cache.json")
+def cue_overrides(episode_id):
+    return os.path.join("output", episode_id, "data", "cue-overrides.json")
 
 
-def split_segments_json(episode_id):
-    return os.path.join("output", episode_id, "data", "split_segments.json")
+def split_segment_cues(episode_id):
+    return os.path.join("output", episode_id, "data", "split-segment-cues.json")
 
 
 def backups_dir(episode_id):
@@ -63,8 +63,8 @@ def vtt_file(episode_id, source_lang, target_lang=None):
     return os.path.join("output", episode_id, "subtitles", f"{episode_id}.{source_lang}-{target_lang}.vtt")
 
 
-def ollama_cache(episode_id):
-    return os.path.join("output", episode_id, "data", "ollama_cache.json")
+def segment_breakpoints(episode_id):
+    return os.path.join("output", episode_id, "data", "segment-breakpoints.json")
 
 
 def translation_cache(episode_id, source_lang, target_lang):

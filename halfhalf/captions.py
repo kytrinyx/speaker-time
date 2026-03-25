@@ -11,7 +11,7 @@ class Captions:
         self.episode_id = episode_id
         self._transcript = Transcript.load(episode_id)
         self._split_cache = {}
-        split_path = paths.split_segments_json(episode_id)
+        split_path = paths.split_segment_cues(episode_id)
         if os.path.exists(split_path):
             with open(split_path) as f:
                 self._split_cache = json.load(f)

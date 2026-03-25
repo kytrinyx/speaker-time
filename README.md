@@ -53,9 +53,9 @@ output/
     │   ├── timeline.csv                  # Speaker timeline with timestamps
     │   ├── transcription.csv             # Complete transcription data
     │   ├── words.csv                     # Word-level timestamps from transcription
-    │   ├── llm_corrections_cache.json    # Cached Claude corrections for intro/outro
-    │   ├── ollama_cache.json             # Cached Ollama LLM splitting results
-    │   ├── split_segments.json           # Cached cue splits (from split-segments)
+    │   ├── cue-overrides.json            # Cached Claude corrections for intro/outro
+    │   ├── segment-breakpoints.json      # Cached Ollama LLM splitting results
+    │   ├── split-segment-cues.json           # Cached cue splits (from split-segments)
     │   ├── translation.ko-en.cache.json  # Cached ko->en translation chunks
     │   └── translation.en-ko.cache.json  # Cached en->ko translation chunks
     ├── audio/                            # Individual audio segments
@@ -116,7 +116,7 @@ An `initial_prompt` is passed to Whisper for each segment to improve transcripti
 - `words.csv` — one row per word per language attempt, with absolute timestamps and probability
 
 ### `correct-intro-outro`
-Uses Claude to detect and correct transcription errors in the intro and outro sequences of the episode. The intro (first few Korean segments) and outro (last segments in each language) tend to have fixed text that repeats across episodes, making them good candidates for LLM correction. Results are cached in `llm_corrections_cache.json`; sequences whose text hasn't changed since the last run are skipped. Corrections are applied by downstream steps when loading the transcript.
+Uses Claude to detect and correct transcription errors in the intro and outro sequences of the episode. The intro (first few Korean segments) and outro (last segments in each language) tend to have fixed text that repeats across episodes, making them good candidates for LLM correction. Results are cached in `cue-overrides.json`; sequences whose text hasn't changed since the last run are skipped. Corrections are applied by downstream steps when loading the transcript.
 
 **Usage:**
 ```bash
@@ -124,12 +124,12 @@ Uses Claude to detect and correct transcription errors in the intro and outro se
 ```
 
 **Output:**
-- `data/llm_corrections_cache.json` — cached corrections keyed by sequence ID
+- `data/cue-overrides.json` — cached corrections keyed by sequence ID
 
 **Requires:** `ANTHROPIC_API_KEY` environment variable.
 
 ### `split-segments`
-Applies `HybridSplit` to each transcription segment to produce shorter, more readable cues with accurate per-cue timestamps: first splits at sentence-ending punctuation, then uses a local Ollama model to sub-split any cue still over 80 characters. Results are cached in `split_segments.json`; segments whose source text is unchanged since the last run are skipped.
+Applies `HybridSplit` to each transcription segment to produce shorter, more readable cues with accurate per-cue timestamps: first splits at sentence-ending punctuation, then uses a local Ollama model to sub-split any cue still over 80 characters. Results are cached in `split-segment-cues.json`; segments whose source text is unchanged since the last run are skipped.
 
 **Usage:**
 ```bash
@@ -137,12 +137,12 @@ Applies `HybridSplit` to each transcription segment to produce shorter, more rea
 ```
 
 **Output:**
-- `data/split_segments.json` — cached cue splits keyed by segment ID
+- `data/split-segment-cues.json` — cached cue splits keyed by segment ID
 
 **Requires:** Ollama running locally; uses `exaone3.5:latest` by default.
 
 ### `create-vtt`
-Converts transcription CSV to WebVTT subtitle format. Skips segments that are empty, timed out, filler-only, or have low confidence (below -1.5 or 0.0). Reads pre-computed cue splits from `split_segments.json` (produced by `split-segments`) when available; falls back to one cue per segment otherwise.
+Converts transcription CSV to WebVTT subtitle format. Skips segments that are empty, timed out, filler-only, or have low confidence (below -1.5 or 0.0). Reads pre-computed cue splits from `split-segment-cues.json` (produced by `split-segments`) when available; falls back to one cue per segment otherwise.
 
 **Usage:**
 ```bash
@@ -192,11 +192,11 @@ Skips the segment if existing confidence is already good (≥ -1.5 and non-zero)
 **Requires:** Whisper model (same as `transcribe`).
 
 ### `split-segment`
-Re-runs the cue splitting logic for a single segment and patches `split_segments.json` in place. Useful when `create-vtt` produces a long or poorly split cue and you want to fix just that one segment without rerunning the whole pipeline.
+Re-runs the cue splitting logic for a single segment and patches `split-segment-cues.json` in place. Useful when `create-vtt` produces a long or poorly split cue and you want to fix just that one segment without rerunning the whole pipeline.
 
 **Usage:**
 ```bash
-./tools/split-segment <episode_id> <segment_id>            # update split_segments.json
+./tools/split-segment <episode_id> <segment_id>            # update split-segment-cues.json
 ./tools/split-segment <episode_id> <segment_id> --dry-run  # print new cues to stdout only
 ```
 

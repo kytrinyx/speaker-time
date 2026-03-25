@@ -35,7 +35,7 @@ def main():
     debug = "--debug" in flags
 
     words_file = paths.words_csv(episode_id)
-    cache_file = paths.split_segments_json(episode_id)
+    cache_file = paths.split_segment_cues(episode_id)
 
     transcript = Transcript.load(episode_id)
     seg = next((s for s in transcript if s.id == segment_id), None)
@@ -118,7 +118,7 @@ def main():
         with open(cache_file, "w") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
 
-        print(f"Updated split_segments.json: segment {segment_id} → {len(cues)} cue{'s' if len(cues) != 1 else ''}")
+        print(f"Updated split-segment-cues.json: segment {segment_id} → {len(cues)} cue{'s' if len(cues) != 1 else ''}")
 
 
 if __name__ == "__main__":

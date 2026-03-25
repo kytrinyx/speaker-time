@@ -21,7 +21,7 @@ def main():
     episode_id = sys.argv[1]
 
     words_file = paths.words_csv(episode_id)
-    cache_file = paths.split_segments_json(episode_id)
+    cache_file = paths.split_segment_cues(episode_id)
 
     if not os.path.exists(words_file):
         print("No words file found; nothing to split.")
