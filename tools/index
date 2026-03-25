@@ -20,5 +20,4 @@ for episode_dir in sorted(glob.glob(os.path.join(output_dir, "*"))):
     video_id = metadata.get("youtube_video_id")
     if not video_id:
         continue
-    studio_url = f"https://studio.youtube.com/video/{video_id}/edit"
-    print(f"{episode_id}\t{studio_url}")
+    print(f"{episode_id},{video_id}")
