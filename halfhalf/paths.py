@@ -22,7 +22,7 @@ def metadata_json(episode_id):
 
 
 def transcription_csv(episode_id):
-    return os.path.join("output", episode_id, "transcription.csv")
+    return os.path.join("output", episode_id, "data", "transcription.csv")
 
 
 def words_csv(episode_id):

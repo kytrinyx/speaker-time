@@ -50,7 +50,8 @@ jeep-ep-004
 output/
 └── jeep-ep-001/
     ├── data/
-    │   └── timeline.csv                  # Speaker timeline with timestamps
+    │   ├── timeline.csv                  # Speaker timeline with timestamps
+    │   └── transcription.csv             # Complete transcription data
     ├── audio/                            # Individual audio segments
     │   ├── 000001.mp3
     │   ├── 000002.mp3
@@ -61,7 +62,6 @@ output/
     │   ├── SPEAKER_01.concatenated.mp3
     │   └── SPEAKER_01.log.json
     ├── metadata.json                     # Video info, speaker stats, and language mapping
-    ├── transcription.csv                 # Complete transcription data
     ├── words.csv                         # Word-level timestamps from transcription
     ├── split_segments.json               # Cached cue splits (from split-segments)
     ├── ollama_cache.json                 # Cached Ollama LLM splitting results
@@ -333,7 +333,7 @@ Initialized by `download` with `youtube_video_id` and `title`. Then written by `
   }
 }
 ```
-### Transcription CSV (`transcription.csv`)
+### Transcription CSV (`data/transcription.csv`)
 Keyed by `(segment_id, language)`. A segment may have two rows when code-switching triggers an alt-language attempt. Downstream steps iterate via `Transcript.__iter__`, which yields the highest-confidence row per segment.
 
 ```csv

@@ -64,6 +64,7 @@ class Transcript:
         self._rows[key] = row
 
     def save(self):
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
         rows = sorted(self._rows.values(), key=lambda r: (int(r['segment_id']), r['language']))
         with open(self.path, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
