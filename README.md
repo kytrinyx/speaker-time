@@ -55,7 +55,9 @@ output/
     │   ├── words.csv                     # Word-level timestamps from transcription
     │   ├── llm_corrections_cache.json    # Cached Claude corrections for intro/outro
     │   ├── ollama_cache.json             # Cached Ollama LLM splitting results
-    │   └── split_segments.json           # Cached cue splits (from split-segments)
+    │   ├── split_segments.json           # Cached cue splits (from split-segments)
+    │   ├── translation.ko-en.cache.json  # Cached ko->en translation chunks
+    │   └── translation.en-ko.cache.json  # Cached en->ko translation chunks
     ├── audio/                            # Individual audio segments
     │   ├── 000001.mp3
     │   ├── 000002.mp3
@@ -66,8 +68,6 @@ output/
     │   ├── SPEAKER_01.concatenated.mp3
     │   └── SPEAKER_01.log.json
     ├── metadata.json                     # Video info, speaker stats, and language mapping
-    ├── translation.ko-en.cache.json      # Cached ko->en translation chunks
-    ├── translation.en-ko.cache.json      # Cached en->ko translation chunks
     └── subtitles/
         ├── jeep-ep-001.en-en.vtt         # English subtitles
         ├── jeep-ep-001.ko-ko.vtt         # Korean subtitles

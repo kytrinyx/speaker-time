@@ -68,4 +68,4 @@ def ollama_cache(episode_id):
 
 
 def translation_cache(episode_id, source_lang, target_lang):
-    return os.path.join("output", episode_id, f"translation.{source_lang}-{target_lang}.cache.json")
+    return os.path.join("output", episode_id, "data", f"translation.{source_lang}-{target_lang}.cache.json")

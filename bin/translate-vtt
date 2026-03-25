@@ -151,6 +151,7 @@ def translate_lines(lines, source_lang, target_lang, cohost, output_dir, cache_f
         print(f"  Chunk {idx + 1}/{len(chunks)} ({len(chunk)} lines)...")
         translated = translate_chunk(chunk, source_lang, target_lang, cohost, output_dir)
         cache[key] = translated
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
         with open(cache_file, "w") as f:
             json.dump(cache, f)
         results.extend(translated)
