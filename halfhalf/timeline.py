@@ -1,6 +1,9 @@
 import csv
+import os
 import statistics
 from dataclasses import dataclass, field
+
+from . import paths
 
 
 @dataclass
@@ -22,9 +25,8 @@ class Timeline:
 
     @classmethod
     def load(cls, episode_id):
-        path = f"output/{episode_id}/timeline.csv"
         segments = []
-        with open(path, newline="") as f:
+        with open(paths.timeline_csv(episode_id), newline="") as f:
             for idx, row in enumerate(csv.DictReader(f)):
                 segment_id = idx + 1
                 segments.append(TimelineSegment(
@@ -32,7 +34,7 @@ class Timeline:
                     speaker_id=row["SPEAKER_ID"],
                     start=float(row["start_time"]),
                     end=float(row["end_time"]),
-                    audio_path=f"output/{episode_id}/audio/{segment_id:06d}.mp3",
+                    audio_path=paths.audio_segment(episode_id, segment_id),
                 ))
         return cls(segments)
 

@@ -7,6 +7,7 @@ import json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from halfhalf.timeline import Timeline
 from halfhalf.language_detector import SerialLanguageDetector, ConcatenatingLanguageDetector, CONFIDENCE_THRESHOLD
+from halfhalf import paths
 
 import whisper
 
@@ -22,10 +23,10 @@ def main():
 
     model = whisper.load_model("small")
 
-    log_dir = os.path.join("output", episode_id, "language_detection")
+    log_dir = paths.language_detection_dir(episode_id)
     os.makedirs(log_dir, exist_ok=True)
 
-    metadata_file = os.path.join("output", episode_id, "metadata.json")
+    metadata_file = paths.metadata_json(episode_id)
     metadata = {}
     if os.path.exists(metadata_file):
         with open(metadata_file) as f:

@@ -3,6 +3,7 @@ import json
 import os
 
 from .segment import Segment, Override
+from . import paths
 
 FIELDNAMES = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
 
@@ -10,8 +11,8 @@ FIELDNAMES = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'lan
 class Transcript:
     def __init__(self, episode_id):
         self.episode_id = episode_id
-        self.path = os.path.join("output", episode_id, "transcription.csv")
-        self._corrections_path = os.path.join("output", episode_id, "llm_corrections_cache.json")
+        self.path = paths.transcription_csv(episode_id)
+        self._corrections_path = paths.llm_corrections_cache(episode_id)
         self._rows = {}  # {(segment_id, language): row}
         self._overrides = {}  # {segment_id: Override}
 

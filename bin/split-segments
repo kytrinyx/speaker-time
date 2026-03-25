@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from halfhalf.word import Word
 from halfhalf.segment_splitter import HybridSplit
 from halfhalf.transcript import Transcript
+from halfhalf import paths
 
 
 def main():
@@ -19,8 +20,8 @@ def main():
 
     episode_id = sys.argv[1]
 
-    words_file = os.path.join("output", episode_id, "words.csv")
-    cache_file = os.path.join("output", episode_id, "split_segments.json")
+    words_file = paths.words_csv(episode_id)
+    cache_file = paths.split_segments_json(episode_id)
 
     if not os.path.exists(words_file):
         print("No words file found; nothing to split.")

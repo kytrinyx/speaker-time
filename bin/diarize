@@ -8,6 +8,7 @@ from pyannote.audio import Pipeline
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from halfhalf.timeline import Timeline
+from halfhalf import paths
 
 def main():
     if len(sys.argv) != 2:
@@ -15,11 +16,11 @@ def main():
         sys.exit(1)
 
     episode_id = sys.argv[1]
-    absolute_path = os.path.abspath(os.path.join("audio", f"{episode_id}.mp3"))
+    absolute_path = os.path.abspath(paths.audio_file(episode_id))
 
-    output_dir = os.path.join("output", episode_id)
+    output_dir = paths.episode_dir(episode_id)
     os.makedirs(output_dir, exist_ok=True)
-    csv_filename = os.path.join(output_dir, "timeline.csv")
+    csv_filename = paths.timeline_csv(episode_id)
 
     # Check if diarization already completed
     if os.path.exists(csv_filename):
@@ -84,7 +85,7 @@ def main():
     distribution = timeline.airtime_distribution()
     speakers = sorted(distribution)
 
-    metadata_file = os.path.join(output_dir, "metadata.json")
+    metadata_file = paths.metadata_json(episode_id)
     metadata = {}
     if os.path.exists(metadata_file):
         with open(metadata_file) as f:

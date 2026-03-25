@@ -54,15 +54,19 @@ output/
     │   ├── 000001.mp3
     │   ├── 000002.mp3
     │   └── ...
-    ├── language_detection/               # Language detection samples
-    │   ├── SPEAKER_00_language_sample.mp3
-    │   └── SPEAKER_01_language_sample.mp3
+    ├── language_detection/               # Language detection samples and logs
+    │   ├── SPEAKER_00.concatenated.mp3
+    │   ├── SPEAKER_00.log.json
+    │   ├── SPEAKER_01.concatenated.mp3
+    │   └── SPEAKER_01.log.json
     ├── metadata.json                     # Video info, speaker stats, and language mapping
     ├── transcription.csv                 # Complete transcription data
     ├── words.csv                         # Word-level timestamps from transcription
     ├── split_segments.json               # Cached cue splits (from split-segments)
     ├── ollama_cache.json                 # Cached Ollama LLM splitting results
     ├── llm_corrections_cache.json        # Cached Claude corrections for intro/outro
+    ├── translation.ko-en.cache.json      # Cached ko->en translation chunks
+    ├── translation.en-ko.cache.json      # Cached en->ko translation chunks
     └── subtitles/
         ├── jeep-ep-001.en-en.vtt         # English subtitles
         ├── jeep-ep-001.ko-ko.vtt         # Korean subtitles
@@ -149,8 +153,7 @@ Converts transcription CSV to WebVTT subtitle format. Skips segments that are em
 ./bin/create-vtt sample
 ```
 
-**Output:**
-- `{episode_id}.vtt`       — Full transcript
+**Output** (written to `subtitles/`):
 - `{episode_id}.en-en.vtt` — English-only captions
 - `{episode_id}.ko-ko.vtt` — Korean-only captions
 
@@ -162,11 +165,11 @@ Translates the Korean and English subtitle files using the Gemini 2.5 Flash API.
 ./bin/translate-vtt <episode_id>
 ```
 
-**Output:**
+**Output** (written to `subtitles/`):
 - `{episode_id}.ko-en.vtt` — Korean captions translated to English
 - `{episode_id}.en-ko.vtt` — English captions translated to Korean
 
-**Requires:** `GEMINI_HALF_AND_HALF_API_KEY` environment variable.
+**Requires:** `GEMINI_HALF_AND_HALF_API_KEY_KO` and `GEMINI_HALF_AND_HALF_API_KEY_EN` environment variables.
 
 ## Tools
 
@@ -188,11 +191,11 @@ Skips the segment if existing confidence is already good (≥ -1.5 and non-zero)
 **Requires:** Whisper model (same as `transcribe`).
 
 ### `split-segment`
-Re-runs the cue splitting logic for a single segment and patches the VTT file in place. Useful when `create-vtt` produces a long or poorly split cue and you want to fix just that one segment without rerunning the whole pipeline.
+Re-runs the cue splitting logic for a single segment and patches `split_segments.json` in place. Useful when `create-vtt` produces a long or poorly split cue and you want to fix just that one segment without rerunning the whole pipeline.
 
 **Usage:**
 ```bash
-./tools/split-segment <episode_id> <segment_id>            # replace cues in the .vtt file
+./tools/split-segment <episode_id> <segment_id>            # update split_segments.json
 ./tools/split-segment <episode_id> <segment_id> --dry-run  # print new cues to stdout only
 ```
 
@@ -235,23 +238,6 @@ Prints a comma-separated list of all processed episodes and their Youtube IDs. T
 ```bash
 ./tools/index
 ```
-
-### `detect-language-file`
-Runs language detection on any audio file and prints the detected language and confidence score. Useful for checking individual language samples without running the full pipeline.
-
-**Usage:**
-```bash
-./tools/detect-language-file <audio-file> [--debug]
-```
-
-**Example:**
-```bash
-./tools/detect-language-file output/jeep-ep-023/language_detection/SPEAKER_02_language_sample.mp3 --debug
-```
-
-**Output:**
-- `language` and `confidence` for the detected language
-- With `--debug`: per-chunk language and confidence, a warning if chunks disagree on language, and stddev of the winning language's confidence across chunks
 
 ## Scripts
 

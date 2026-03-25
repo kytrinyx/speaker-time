@@ -5,16 +5,18 @@ import os
 import csv
 import ffmpeg
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from halfhalf import paths
+
 def main():
     if len(sys.argv) != 2:
         print("Usage: cut-audio <episode_id>")
         sys.exit(1)
 
     episode_id = sys.argv[1]
-    absolute_path = os.path.abspath(os.path.join("audio", f"{episode_id}.mp3"))
+    absolute_path = os.path.abspath(paths.audio_file(episode_id))
 
-    output_dir = os.path.join("output", episode_id)
-    csv_filename = os.path.join(output_dir, "timeline.csv")
+    csv_filename = paths.timeline_csv(episode_id)
 
     # Check if timeline CSV exists
     if not os.path.exists(csv_filename):
@@ -23,7 +25,7 @@ def main():
         sys.exit(1)
 
     # Create audio subdirectory for segment files
-    audio_dir = os.path.join(output_dir, "audio")
+    audio_dir = paths.audio_dir(episode_id)
     os.makedirs(audio_dir, exist_ok=True)
 
     # Read CSV and cut audio segments
@@ -35,7 +37,7 @@ def main():
             end_time = float(row['end_time'])
 
             # Generate 6-digit zero-padded filename
-            segment_filename = os.path.join(audio_dir, f"{i:06d}.mp3")
+            segment_filename = paths.audio_segment(episode_id, i)
 
             # Skip if audio segment already exists
             if os.path.exists(segment_filename):

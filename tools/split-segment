@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from halfhalf.word import Word
 from halfhalf.segment_splitter import HybridSplit, PunctuationSplit, OllamaSplit, MAX_CHARS
 from halfhalf.transcript import Transcript
+from halfhalf import paths
 
 
 def format_timestamp(seconds):
@@ -33,8 +34,8 @@ def main():
     dry_run = "--dry-run" in flags
     debug = "--debug" in flags
 
-    words_file = os.path.join("output", episode_id, "words.csv")
-    cache_file = os.path.join("output", episode_id, "split_segments.json")
+    words_file = paths.words_csv(episode_id)
+    cache_file = paths.split_segments_json(episode_id)
 
     transcript = Transcript.load(episode_id)
     seg = next((s for s in transcript if s.id == segment_id), None)

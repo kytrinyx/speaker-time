@@ -11,6 +11,7 @@ from halfhalf.prompts import build_prompts
 from halfhalf.transcriber import Transcriber
 from halfhalf.words import Words
 from halfhalf.timeline import Timeline
+from halfhalf import paths
 
 
 def main():
@@ -21,10 +22,10 @@ def main():
     episode_id = sys.argv[1]
     prompts = build_prompts(episode_id)
 
-    output_dir = os.path.join("output", episode_id)
-    timeline_file = os.path.join(output_dir, "timeline.csv")
-    metadata_file = os.path.join(output_dir, "metadata.json")
-    audio_dir = os.path.join(output_dir, "audio")
+    output_dir = paths.episode_dir(episode_id)
+    timeline_file = paths.timeline_csv(episode_id)
+    metadata_file = paths.metadata_json(episode_id)
+    audio_dir = paths.audio_dir(episode_id)
 
     if not os.path.exists(timeline_file):
         print(f"Error: Timeline CSV not found: {timeline_file}")
@@ -48,18 +49,17 @@ def main():
                 speaker_skip[speaker] = data.get("skip", False)
 
     timeline = Timeline.load(episode_id)
-    words_file = os.path.join(output_dir, "words.csv")
     transcript = Transcript.load(episode_id)
-    words_csv = Words.load(words_file)
+    words_csv = Words.load(paths.words_csv(episode_id))
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     if os.path.exists(transcript.path):
         backup = os.path.join(output_dir, f"bk.{timestamp}.transcription.csv")
         shutil.copy2(transcript.path, backup)
         print(f"Backed up transcription.csv to {os.path.basename(backup)}")
-    if os.path.exists(words_file):
+    if os.path.exists(words_csv.path):
         backup = os.path.join(output_dir, f"bk.{timestamp}.words.csv")
-        shutil.copy2(words_file, backup)
+        shutil.copy2(words_csv.path, backup)
         print(f"Backed up words.csv to {os.path.basename(backup)}")
 
     transcriber = Transcriber(prompts, transcript, words_csv)

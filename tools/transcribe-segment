@@ -11,6 +11,7 @@ from halfhalf.transcript import Transcript
 from halfhalf.prompts import build_prompts
 from halfhalf.transcriber import Transcriber
 from halfhalf.words import Words
+from halfhalf import paths
 
 
 
@@ -23,11 +24,11 @@ def main():
     segment_id = int(sys.argv[2])
     prompts = build_prompts(episode_id)
 
-    output_dir = os.path.join("output", episode_id)
-    timeline_file = os.path.join(output_dir, "timeline.csv")
-    metadata_file = os.path.join(output_dir, "metadata.json")
-    words_file = os.path.join(output_dir, "words.csv")
-    audio_file = os.path.join(output_dir, "audio", f"{segment_id:06d}.mp3")
+    output_dir = paths.episode_dir(episode_id)
+    timeline_file = paths.timeline_csv(episode_id)
+    metadata_file = paths.metadata_json(episode_id)
+    words_file = paths.words_csv(episode_id)
+    audio_file = paths.audio_segment(episode_id, segment_id)
 
     os.makedirs("logs", exist_ok=True)
     log_file = os.path.join("logs", f"transcribe-cue.{episode_id}.log")

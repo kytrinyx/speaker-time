@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from halfhalf.captions import Captions
 from halfhalf.cue import Cue
 from halfhalf.prompts import cohost_for
+from halfhalf import paths
 
 
 GEMINI_API_URL = (
@@ -172,8 +173,8 @@ def main():
         sys.exit(1)
 
     episode_id = sys.argv[1]
-    output_dir = os.path.join("output", episode_id)
-    episode_subtitles_dir = os.path.join(output_dir, "subtitles")
+    output_dir = paths.episode_dir(episode_id)
+    episode_subtitles_dir = paths.subtitles_dir(episode_id)
     os.makedirs(episode_subtitles_dir, exist_ok=True)
     cohost = cohost_for(episode_id)
     subtitles_dir = os.environ.get("HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
@@ -181,7 +182,7 @@ def main():
     all_cues = list(Captions.load(episode_id))
 
     for source_lang, target_lang in (("ko", "en"), ("en", "ko")):
-        output_file = os.path.join(episode_subtitles_dir, f"{episode_id}.{source_lang}-{target_lang}.vtt")
+        output_file = paths.vtt_file(episode_id, source_lang, target_lang)
 
         if os.path.exists(output_file):
             print(f"Skipping {output_file} (already exists)")
@@ -190,7 +191,7 @@ def main():
         cues = [c for c in all_cues if c.language == source_lang]
         lines = [c.text for c in cues]
 
-        cache_file = os.path.join(output_dir, f"translation.{source_lang}-{target_lang}.cache.json")
+        cache_file = paths.translation_cache(episode_id, source_lang, target_lang)
 
         print(f"Translating {source_lang}->{target_lang} ({len(lines)} lines)")
         try:

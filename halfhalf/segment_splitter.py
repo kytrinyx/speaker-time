@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from .cue import Cue
 from .segment import Segment, clean
+from . import paths
 
 MAX_CHARS = {"ko": 45, "default": 80}
 
@@ -182,7 +183,7 @@ class HybridSplit:
         self.max_chars_by_lang = max_chars_by_lang if max_chars_by_lang is not None else MAX_CHARS
         self._punct = PunctuationSplit(max_chars_by_lang=self.max_chars_by_lang)
         if cache_path is None and episode_id is not None:
-            cache_path = os.path.join("output", episode_id, "ollama_cache.json")
+            cache_path = paths.ollama_cache(episode_id)
         self._ollama = OllamaSplit(model=model, cache_path=cache_path)
         parts = ", ".join(f"{k}={v}" for k, v in self.max_chars_by_lang.items())
         self.name = f"hybrid({parts})"

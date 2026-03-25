@@ -6,6 +6,7 @@ import shutil
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from halfhalf.captions import Captions
+from halfhalf import paths
 
 
 def main():
@@ -20,11 +21,11 @@ def main():
     cues = list(captions)
 
     subtitles_dir = os.environ.get("HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
-    episode_subtitles_dir = os.path.join("output", episode_id, "subtitles")
+    episode_subtitles_dir = paths.subtitles_dir(episode_id)
     os.makedirs(episode_subtitles_dir, exist_ok=True)
     for lang in ("ko", "en"):
         lang_cues = [c for c in cues if c.language == lang]
-        vtt_file = os.path.join(episode_subtitles_dir, f"{episode_id}.{lang}-{lang}.vtt")
+        vtt_file = paths.vtt_file(episode_id, lang)
         with open(vtt_file, "w") as f:
             f.write("WEBVTT\n\n")
             for cue in lang_cues:
