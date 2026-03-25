@@ -49,7 +49,7 @@ def main():
         run_script("create-vtt", episode_id)
         run_script("translate-vtt", episode_id)
 
-        subtitles_dir = os.environ.get("FINAL_HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
+        subtitles_dir = os.environ.get("HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
         index_path = os.path.join(os.path.dirname(__file__), "..", "tools", "index")
         index_file = os.path.join(subtitles_dir, "_INDEX.txt")
         with open(index_file, "w") as f:

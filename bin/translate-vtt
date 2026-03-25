@@ -9,6 +9,8 @@ import urllib.request
 import urllib.error
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from halfhalf.captions import Captions
+from halfhalf.cue import Cue
 from halfhalf.prompts import cohost_for
 
 
@@ -18,38 +20,11 @@ GEMINI_API_URL = (
 )
 
 
-def translate_vtt(vtt_content, source_lang, target_lang, cohost):
+def call_gemini(prompt):
     api_key = os.environ.get("GEMINI_HALF_AND_HALF_API_KEY")
     if not api_key:
         print("Error: GEMINI_HALF_AND_HALF_API_KEY environment variable not set")
         sys.exit(1)
-
-    if source_lang == "ko" and target_lang == "en":
-        prompt = (
-            f"This is the Half & Half podcast (하프앤하프). "
-            f"The hosts are {cohost} and 정태웅 (also called 태웅쌤).\n\n"
-            "Translate the Korean subtitle text into English. "
-            "Preserve the WEBVTT format exactly:\n"
-            "- Keep the \"WEBVTT\" header line unchanged\n"
-            "- Keep all timestamp lines (e.g. \"00:00:12.487 --> 00:00:14.287\") unchanged\n"
-            "- Keep all blank lines unchanged\n"
-            "- Only translate the text lines\n"
-            "- Do not add any explanation or commentary\n\n"
-            + vtt_content
-        )
-    else:
-        prompt = (
-            f"이것은 하프앤하프(Half & Half) 팟캐스트입니다. "
-            f"진행자는 {cohost}과 정태웅(태웅쌤)입니다.\n\n"
-            "영어 자막 텍스트를 한국어로 번역하세요. "
-            "WEBVTT 형식을 정확히 유지하세요:\n"
-            "- \"WEBVTT\" 헤더 줄은 그대로 유지\n"
-            "- 타임스탬프 줄(예: \"00:00:12.487 --> 00:00:14.287\")은 그대로 유지\n"
-            "- 빈 줄은 그대로 유지\n"
-            "- 텍스트 줄만 번역\n"
-            "- 설명이나 주석을 추가하지 마세요\n\n"
-            + vtt_content
-        )
 
     payload = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}]
@@ -79,6 +54,85 @@ def translate_vtt(vtt_content, source_lang, target_lang, cohost):
                 sys.exit(1)
 
 
+CHUNK_SIZE = 100
+
+
+def translate_chunk(lines, source_lang, target_lang, cohost):
+    n = len(lines)
+    numbered_text = "\n".join(f"{i+1}|{line}" for i, line in enumerate(lines))
+
+    if source_lang == "ko" and target_lang == "en":
+        prompt = (
+            f"This is the Half & Half podcast (하프앤하프). "
+            f"The hosts are {cohost} and 정태웅 (also called 태웅쌤).\n\n"
+            f"Translate each numbered Korean subtitle line into English.\n"
+            f"There are exactly {n} lines to translate, numbered 1 through {n}.\n"
+            "Rules:\n"
+            "- Each line is formatted as: NUMBER|TEXT\n"
+            "- Return each line in the same format: NUMBER|TRANSLATED TEXT\n"
+            f"- Every number from 1 to {n} must appear exactly once in your output\n"
+            "- Translate every line, even if it is very short or a sentence fragment — do not skip any\n"
+            "- If a line is empty, return it empty: NUMBER|\n"
+            "- Do not merge, split, or reorder any lines\n"
+            "- Do not add any explanation or commentary\n\n"
+            + numbered_text
+        )
+    else:
+        prompt = (
+            f"이것은 하프앤하프(Half & Half) 팟캐스트입니다. "
+            f"진행자는 {cohost}과 정태웅(태웅쌤)입니다.\n\n"
+            f"번호가 붙은 각 영어 자막 줄을 한국어로 번역하세요.\n"
+            f"번역할 줄은 정확히 {n}개이며, 1번부터 {n}번까지 번호가 붙어 있습니다.\n"
+            "규칙:\n"
+            "- 각 줄의 형식: 번호|텍스트\n"
+            "- 출력 형식도 동일하게: 번호|번역된 텍스트\n"
+            f"- 1번부터 {n}번까지 모든 번호가 출력에 정확히 한 번씩 나타나야 합니다\n"
+            "- 매우 짧거나 불완전한 문장이라도 반드시 번역하세요 — 건너뛰지 마세요\n"
+            "- 빈 줄은 빈 줄로 반환하세요: 번호|\n"
+            "- 줄을 합치거나, 나누거나, 순서를 바꾸지 마세요\n"
+            "- 설명이나 주석을 추가하지 마세요\n\n"
+            + numbered_text
+        )
+
+    response = call_gemini(prompt)
+
+    translated = {}
+    for line in response.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if "|" in line:
+            prefix, _, text = line.partition("|")
+            prefix = prefix.strip()
+            if prefix.isdigit():
+                translated[int(prefix)] = text
+
+    if len(translated) != n:
+        print("--- Gemini response ---")
+        print(response)
+        print("--- End response ---")
+        raise ValueError(f"sent {n} lines, got back {len(translated)} translated lines")
+
+    return [translated[i + 1] for i in range(n)]
+
+
+def translate_lines(lines, source_lang, target_lang, cohost):
+    chunks = [lines[i:i + CHUNK_SIZE] for i in range(0, len(lines), CHUNK_SIZE)]
+    results = []
+    for idx, chunk in enumerate(chunks):
+        print(f"  Chunk {idx + 1}/{len(chunks)} ({len(chunk)} lines)...")
+        results.extend(translate_chunk(chunk, source_lang, target_lang, cohost))
+    return results
+
+
+def write_vtt(cues, translated_texts, path):
+    with open(path, "w") as f:
+        f.write("WEBVTT\n\n")
+        for cue, text in zip(cues, translated_texts):
+            f.write(f"{Cue.format_timestamp(cue.start)} --> {Cue.format_timestamp(cue.end)}\n")
+            f.write(f"{text}\n\n")
+
+
 def main():
     if len(sys.argv) != 2:
         print("Usage: translate-vtt <episode_id>")
@@ -88,28 +142,27 @@ def main():
     episode_id = sys.argv[1]
     output_dir = os.path.join("output", episode_id)
     cohost = cohost_for(episode_id)
-    subtitles_dir = os.environ.get("FINAL_HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
+    subtitles_dir = os.environ.get("HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
+
+    all_cues = list(Captions.load(episode_id))
 
     for source_lang, target_lang in (("ko", "en"), ("en", "ko")):
-        input_file = os.path.join(output_dir, f"{episode_id}.{source_lang}-{source_lang}.vtt")
         output_file = os.path.join(output_dir, f"{episode_id}.{source_lang}-{target_lang}.vtt")
 
         if os.path.exists(output_file):
             print(f"Skipping {output_file} (already exists)")
             continue
 
-        if not os.path.exists(input_file):
-            print(f"Warning: {input_file} not found, skipping")
-            continue
+        cues = [c for c in all_cues if c.language == source_lang]
+        lines = [c.text for c in cues]
 
-        with open(input_file) as f:
-            vtt_content = f.read()
-
-        print(f"Translating {input_file} -> {output_file}")
-        translated = translate_vtt(vtt_content, source_lang, target_lang, cohost)
-
-        with open(output_file, "w") as f:
-            f.write(translated)
+        print(f"Translating {source_lang}->{target_lang} ({len(lines)} lines)")
+        try:
+            translated = translate_lines(lines, source_lang, target_lang, cohost)
+        except ValueError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+        write_vtt(cues, translated, output_file)
 
         print(f"Translation written: {output_file}")
         shutil.copy(output_file, subtitles_dir)
