@@ -1,6 +1,6 @@
 import pytest
 from halfhalf.segment import Segment, Word
-from halfhalf.mecab_split import MecabSplit, _find_split_word_indices, _build_cues
+from halfhalf.mecab_split import MecabSplit, _find_split_word_indices
 
 
 def seg(text, language, words):
@@ -48,77 +48,39 @@ def test_multiple_splits():
     assert _find_split_word_indices('공부하고 쉬면 좋겠지만 모르겠어요') == [0, 1, 2]
 
 
-# --- _build_cues ---
+# --- MecabSplit.find_splits ---
 
-def test_single_split_index_produces_two_cues():
-    s = seg('오늘은 공부하고 내일은 쉬어요', 'ko', [
-        Word('오늘은', 0.0, 0.5),
-        Word(' 공부하고', 0.5, 1.0),
-        Word(' 내일은', 1.0, 1.5),
-        Word(' 쉬어요', 1.5, 2.0),
-    ])
-    cues = _build_cues(s, [1])
-    assert len(cues) == 2
-    assert cues[0].text == '오늘은 공부하고'
-    assert cues[1].text == '내일은 쉬어요'
-
-def test_timestamps_come_from_whisper_words():
-    s = seg('가고 싶어요', 'ko', [
-        Word('가고', 1.0, 1.5),
-        Word(' 싶어요', 2.0, 3.0),
-    ])
-    cues = _build_cues(s, [0])
-    assert cues[0].start == 1.0
-    assert cues[0].end == 1.5
-    assert cues[1].start == 2.0
-    assert cues[1].end == 3.0
-
-def test_empty_split_indices_returns_single_cue():
-    s = seg('안녕하세요', 'ko', [Word('안녕하세요', 0.0, 1.0)])
-    cues = _build_cues(s, [])
-    assert len(cues) == 1
-
-def test_multiple_split_indices():
-    s = seg('하나 둘 셋 넷', 'ko', [
-        Word('하나', 0.0, 0.5),
-        Word(' 둘', 0.5, 1.0),
-        Word(' 셋', 1.0, 1.5),
-        Word(' 넷', 1.5, 2.0),
-    ])
-    cues = _build_cues(s, [0, 2])
-    assert len(cues) == 3
-    assert cues[0].text == '하나'
-    assert cues[1].text == '둘 셋'
-    assert cues[2].text == '넷'
-
-
-# --- MecabSplit.split (integration) ---
-
-def test_english_returns_single_cue():
+def test_english_returns_empty():
     s = seg('Hello there', 'en', [
         Word('Hello', 0.0, 0.5),
         Word(' there', 0.5, 1.0),
     ])
-    cues = MecabSplit().split(s)
-    assert len(cues) == 1
+    assert MecabSplit().find_splits(s) == []
 
-def test_no_words_returns_single_cue():
+def test_no_words_returns_empty():
     s = Segment(id=1, start=0.0, end=1.0, raw_text='안녕하세요', language='ko', words=[])
-    cues = MecabSplit().split(s)
-    assert len(cues) == 1
+    assert MecabSplit().find_splits(s) == []
 
-def test_korean_with_ec_splits():
-    s = seg('공부하고 싶어요', 'ko', [
-        Word('공부하고', 0.0, 0.8),
-        Word(' 싶어요', 0.8, 1.5),
-    ])
-    cues = MecabSplit().split(s)
-    assert len(cues) == 2
-
-def test_korean_without_ec_stays_whole():
+def test_korean_without_ec_returns_empty():
     s = seg('안녕하세요 반갑습니다', 'ko', [
         Word('안녕하세요', 0.0, 0.8),
         Word(' 반갑습니다', 0.8, 1.5),
     ])
-    cues = MecabSplit().split(s)
-    assert len(cues) == 1
+    assert MecabSplit().find_splits(s) == []
+
+def test_korean_with_ec_returns_whisper_index():
+    # split after 공부하고 (space-word 0) → new chunk starts at Whisper word 1
+    s = seg('공부하고 싶어요', 'ko', [
+        Word('공부하고', 0.0, 0.8),
+        Word(' 싶어요', 0.8, 1.5),
+    ])
+    assert MecabSplit().find_splits(s) == [1]
+
+def test_multiple_ec_splits():
+    s = seg('공부하고 쉬면 좋겠지만 모르겠어요', 'ko', [
+        Word('공부하고', 0.0, 0.5),
+        Word(' 쉬면', 0.5, 1.0),
+        Word(' 좋겠지만', 1.0, 1.5),
+        Word(' 모르겠어요', 1.5, 2.0),
+    ])
+    assert MecabSplit().find_splits(s) == [1, 2, 3]

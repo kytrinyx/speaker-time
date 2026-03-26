@@ -1,8 +1,6 @@
 import mecab_ko
 
-from .cue import Cue
 from .punctuation_split import normalize
-from .segment import clean
 
 
 TARGET_EC = {'고', '면', '자', '니까', '지만', '는데'}
@@ -60,75 +58,60 @@ def _find_split_word_indices(text):
     return splits
 
 
-def _build_cues(segment, split_indices):
-    """Build cues from a segment and a list of space-word split indices.
+def _space_to_whisper_indices(space_indices, raw_text, whisper_words):
+    """Map space-word split indices to Whisper word indices.
 
-    Each index i in split_indices means: split after space-separated word i
-    in segment.raw_text. Maps word boundaries to Whisper word timestamps via
-    normalized text matching.
+    Each space-word split index s means "split after space-word s", i.e. the
+    next chunk starts at space-word s+1. This function finds the first Whisper
+    word index that belongs to that next chunk via normalized text matching.
     """
-    raw_words = segment.raw_text.split()
-    boundaries = [0] + [i + 1 for i in split_indices] + [len(raw_words)]
-    chunks = [" ".join(raw_words[s:e]) for s, e in zip(boundaries, boundaries[1:])]
-    chunks = [c for c in chunks if c]
-    if len(chunks) <= 1:
-        return [Cue(segment.start, segment.end, segment.text)]
+    raw_words = raw_text.split()
+    full_norm = normalize("".join(w.text for w in whisper_words))
 
-    full_norm = normalize("".join(w.text for w in segment.words))
-
-    cues = []
-    cursor = 0
-
-    for chunk in chunks:
-        chunk_norm = normalize(chunk)
-        if not chunk_norm:
+    result = []
+    for s in space_indices:
+        # The next chunk starts at raw_words[s+1]
+        chunk_start_norm = normalize(" ".join(raw_words[s + 1:]))
+        if not chunk_start_norm:
             continue
 
-        pos = full_norm.find(chunk_norm, cursor)
+        # Find where this chunk starts in the normalized whisper stream
+        pos = full_norm.find(normalize(raw_words[s + 1]))
         if pos == -1:
-            pos = cursor
-        end_pos = pos + len(chunk_norm)
+            continue
 
         char_pos = 0
-        chunk_words = []
-        for w in segment.words:
+        for w_idx, w in enumerate(whisper_words):
             w_norm = normalize(w.text)
-            w_start, w_end = char_pos, char_pos + len(w_norm)
-            if w_end > pos and w_start < end_pos:
-                chunk_words.append(w)
-            char_pos = w_end
+            if char_pos + len(w_norm) > pos:
+                result.append(w_idx)
+                break
+            char_pos += len(w_norm)
 
-        if chunk_words:
-            cleaned = clean(chunk, segment.language)
-            if cleaned:
-                cues.append(Cue(chunk_words[0].start, chunk_words[-1].end, cleaned))
-        cursor = end_pos
-
-    if not cues:
-        return [Cue(segment.start, segment.end, segment.text)]
-    return cues
+    return result
 
 
 class MecabSplit:
-    """Split Korean segments at clause boundaries detected by MeCab.
+    """Find split points in Korean segments at clause boundaries detected by MeCab.
 
     Runs MeCab on the full segment text and splits after words whose final
     morpheme is a target EC (연결어미): 고, 면, 자, 니까, 지만, 는데.
 
-    English segments are returned as-is (single cue).
+    English segments return an empty list.
     """
 
     name = "mecab"
 
-    def split(self, segment):
+    def find_splits(self, segment):
+        """Return word indices into segment.words where new chunks begin."""
         if segment.language != 'ko':
-            return [Cue(segment.start, segment.end, segment.text)]
+            return []
 
         if not segment.words:
-            return [Cue(segment.start, segment.end, segment.text)]
+            return []
 
-        split_indices = _find_split_word_indices(segment.raw_text)
-        if not split_indices:
-            return [Cue(segment.start, segment.end, segment.text)]
+        space_indices = _find_split_word_indices(segment.raw_text)
+        if not space_indices:
+            return []
 
-        return _build_cues(segment, split_indices)
+        return _space_to_whisper_indices(space_indices, segment.raw_text, segment.words)

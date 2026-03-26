@@ -1,49 +1,38 @@
-from .cue import Cue
-from .segment import clean
-
-
 class SilenceSplit:
-    """Split a segment at silence boundaries detected by ffmpeg.
+    """Find split points at silence boundaries detected by ffmpeg.
 
-    Silences are matched to inter-word gaps by overlap. Each qualifying silence
-    ends the current cue at the 2/3 point of the silence window; the next cue
-    starts at the following word's actual start time.
+    Silences are matched to inter-word gaps by overlap. Returns word indices
+    where new chunks begin, split into mandatory (≥ 0.4s) and potential (≥ 0.1s).
     """
 
     name = "silence"
 
-    def __init__(self, silences, min_silence=0.4):
-        self.silences = [(s, e) for s, e in silences if e - s >= min_silence]
+    def __init__(self, silences):
+        self.silences = list(silences)
 
-    def split(self, segment):
+    def find_splits(self, segment):
+        """Return {'mandatory': List[int], 'potential': List[int]} of word indices.
+
+        Index i means "start a new chunk at segment.words[i]".
+        mandatory — silences ≥ 0.4s (hard walls the merge phase never crosses)
+        potential — silences ≥ 0.1s (includes mandatory; all are valid split candidates)
+        """
         if not segment.words:
-            return [Cue(segment.start, segment.end, segment.text)]
+            return {'mandatory': [], 'potential': []}
 
         words = segment.words
+        mandatory, potential = [], []
 
-        # For each consecutive word pair, find a silence that overlaps the gap.
-        split_points = []  # (word_index i, split_time) — split after words[i]
         for i in range(len(words) - 1):
             gap_start = words[i].end
             gap_end = words[i + 1].start
             for s, e in self.silences:
                 if s < gap_end and e > gap_start:
-                    split_points.append((i, s + (e - s) * 2 / 3))
+                    dur = e - s
+                    if dur >= 0.1:
+                        potential.append(i + 1)
+                        if dur >= 0.4:
+                            mandatory.append(i + 1)
                     break
 
-        if not split_points:
-            return [Cue(segment.start, segment.end, segment.text)]
-
-        boundaries = [0] + [i + 1 for i, _ in split_points] + [len(words)]
-        end_times = [t for _, t in split_points] + [words[-1].end]
-
-        cues = []
-        for k, (start_idx, end_idx) in enumerate(zip(boundaries, boundaries[1:])):
-            chunk = words[start_idx:end_idx]
-            if chunk:
-                text = "".join(w.text for w in chunk).strip()
-                cleaned = clean(text, segment.language)
-                if cleaned:
-                    cues.append(Cue(chunk[0].start, end_times[k], cleaned))
-
-        return cues if cues else [Cue(segment.start, segment.end, segment.text)]
+        return {'mandatory': mandatory, 'potential': potential}

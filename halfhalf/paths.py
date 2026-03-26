@@ -71,5 +71,9 @@ def translation_cache(episode_id, source_lang, target_lang):
     return os.path.join("output", episode_id, "data", f"translation.{source_lang}-{target_lang}.cache.json")
 
 
+def silences_csv(episode_id):
+    return os.path.join("output", episode_id, "data", "silences.csv")
+
+
 def logs_dir(episode_id):
     return os.path.join("output", episode_id, "logs")
