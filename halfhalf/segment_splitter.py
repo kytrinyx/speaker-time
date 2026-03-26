@@ -6,7 +6,8 @@ from .punctuation_split import PunctuationSplit
 from .silence_split import SilenceSplit
 from .mecab_split import MecabSplit
 from .spacy_split import SpacySplit
-from .fragment_merger import FragmentMerger, MAX_CHARS as MERGE_MAX_CHARS
+from . import fragment_merger
+from .fragment_merger import MAX_CHARS as MERGE_MAX_CHARS
 from . import paths
 
 MAX_CHARS = {"ko": 45, "default": 80}
@@ -179,7 +180,6 @@ class SegmentSplitter:
         self._silence = SilenceSplit(silences)
         self._mecab = MecabSplit()
         self._spacy = SpacySplit()
-        self._merge = FragmentMerger(max_chars_by_lang=self.max_chars_by_lang)
         if cache_path is None and episode_id is not None:
             cache_path = paths.segment_breakpoints(episode_id)
         self._ollama = OllamaSplit(model=model, cache_path=cache_path)
@@ -226,7 +226,7 @@ class SegmentSplitter:
         elif self.verbose and is_long:
             print(f"  OLLAMA:   not needed")
 
-        cues = self._merge.merge(segment, all_splits, strong_splits, weak_splits, verbose=self.verbose and is_long)
+        cues = fragment_merger.merge(segment, all_splits, strong_splits, weak_splits, verbose=self.verbose and is_long, max_chars_by_lang=self.max_chars_by_lang)
 
         if self.verbose and is_long:
             print(f"  FINAL ({len(cues)} cues):")
