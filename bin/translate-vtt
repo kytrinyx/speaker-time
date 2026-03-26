@@ -50,7 +50,7 @@ def call_replicate(system, user):
     return "".join(data["output"])
 
 
-def translate_chunk(lines, source_lang, target_lang, cohost):
+def translate_chunk(lines, source_lang, target_lang, cohost, log_path):
     payload = [{"id": i + 1, "text": text} for i, text in enumerate(lines)]
     n = len(lines)
 
@@ -85,16 +85,35 @@ def translate_chunk(lines, source_lang, target_lang, cohost):
     if text.startswith("```"):
         text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
 
-    result = json.loads(text)
+    try:
+        result = json.loads(text)
+    except json.JSONDecodeError:
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, "w") as f:
+            f.write(f"--- sent payload ---\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n")
+            f.write(f"\n--- raw response ---\n{text}\n")
+        raise
     translated = {item["id"]: item["text"] for item in result}
 
     if len(translated) != n:
-        raise ValueError(f"sent {n} lines, got back {len(translated)} translated lines")
+        expected_ids = set(range(1, n + 1))
+        got_ids = set(translated.keys())
+        missing = sorted(expected_ids - got_ids)
+        extra = sorted(got_ids - expected_ids)
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, "w") as f:
+            f.write(f"sent {n} lines, got back {len(translated)}\n")
+            f.write(f"missing ids: {missing}\n")
+            if extra:
+                f.write(f"extra ids: {extra}\n")
+            f.write(f"\n--- sent payload ---\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n")
+            f.write(f"\n--- raw response ---\n{text}\n")
+        raise ValueError(f"sent {n} lines, got back {len(translated)} translated lines (missing ids: {missing}; see {log_path})")
 
     return [translated[i + 1] for i in range(n)]
 
 
-def translate_lines(lines, source_lang, target_lang, cohost, cache_file):
+def translate_lines(lines, source_lang, target_lang, cohost, cache_file, log_path):
     cache = {}
     if os.path.exists(cache_file):
         with open(cache_file) as f:
@@ -109,7 +128,7 @@ def translate_lines(lines, source_lang, target_lang, cohost, cache_file):
 
     for idx, chunk in enumerate(chunks):
         print(f"  Chunk {idx + 1}/{len(chunks)} ({len(chunk)} lines)...")
-        translated = translate_chunk(chunk, source_lang, target_lang, cohost)
+        translated = translate_chunk(chunk, source_lang, target_lang, cohost, log_path)
         for source, result in zip(chunk, translated):
             cache[source] = result
         os.makedirs(os.path.dirname(cache_file), exist_ok=True)
@@ -155,10 +174,11 @@ def main():
         lines = [c.text for c in cues]
 
         cache_file = paths.translation_cache(episode_id, source_lang, target_lang)
+        log_path = os.path.join(paths.logs_dir(episode_id), f"translate-{source_lang}-{target_lang}.log")
 
         print(f"Translating {source_lang}->{target_lang} ({len(lines)} lines)")
         try:
-            translated = translate_lines(lines, source_lang, target_lang, cohost, cache_file)
+            translated = translate_lines(lines, source_lang, target_lang, cohost, cache_file, log_path)
         except (ValueError, json.JSONDecodeError) as e:
             print(f"Error: {e}")
             sys.exit(1)
