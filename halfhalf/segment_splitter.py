@@ -6,7 +6,7 @@ from .punctuation_split import PunctuationSplit
 from .silence_split import SilenceSplit
 from .mecab_split import MecabSplit
 from .spacy_split import SpacySplit
-from .merge import FragmentMerger, MAX_CHARS as MERGE_MAX_CHARS
+from .fragment_merger import FragmentMerger, MAX_CHARS as MERGE_MAX_CHARS
 from . import paths
 
 MAX_CHARS = {"ko": 45, "default": 80}

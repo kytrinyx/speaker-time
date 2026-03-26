@@ -1,5 +1,5 @@
 from halfhalf.segment import Segment, Word
-from halfhalf.merge import FragmentMerger
+from halfhalf.fragment_merger import FragmentMerger
 
 
 def seg(text, language, words):
