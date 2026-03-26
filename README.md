@@ -240,6 +240,14 @@ Prints a comma-separated list of all processed episodes and their Youtube IDs. T
 ./tools/index
 ```
 
+## Testing
+
+Tests live in `tests/`. Run a specific test file with:
+
+```bash
+python -m pytest tests/test_punctuation_split.py
+```
+
 ## Scripts
 
 Ad-hoc scripts go in the `./scripts/` in order to not pollute `./bin`.
