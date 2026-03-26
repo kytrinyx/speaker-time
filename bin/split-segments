@@ -8,9 +8,9 @@ from dataclasses import replace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from halfhalf.word import Word
-from halfhalf.segment_splitter import HybridSplit
+from halfhalf.segment_splitter import SegmentSplitter
 from halfhalf.transcript import Transcript
-from halfhalf import paths
+from halfhalf import paths, silence_detector
 
 
 def main():
@@ -20,12 +20,22 @@ def main():
 
     episode_id = sys.argv[1]
 
+    silences_file = paths.silences_csv(episode_id)
     words_file = paths.words_csv(episode_id)
     cache_file = paths.split_segment_cues(episode_id)
 
     if not os.path.exists(words_file):
         print("No words file found; nothing to split.")
         return
+
+    if not os.path.exists(silences_file):
+        print("Detecting silences...")
+        silences = silence_detector.detect(episode_id)
+    else:
+        silences = []
+        with open(silences_file) as f:
+            for row in csv.DictReader(f):
+                silences.append((float(row["start_time"]), float(row["end_time"])))
 
     # Load existing cache
     cache = {}
@@ -50,9 +60,11 @@ def main():
             continue
         segments.append(replace(seg, words=words_by_segment[(seg.id, seg.language)]))
 
-    splitter = HybridSplit(episode_id=episode_id)
+    splitter = SegmentSplitter(silences, episode_id=episode_id)
     split_count = 0
     skip_count = 0
+
+    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
 
     for seg in segments:
         key = str(seg.id)
@@ -70,9 +82,8 @@ def main():
         elif key in cache:
             del cache[key]
 
-    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
-    with open(cache_file, "w") as f:
-        json.dump(cache, f, ensure_ascii=False, indent=2)
+        with open(cache_file, "w") as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
 
     print(f"Split segments saved to: {cache_file}")
     print(f"Split {split_count} segments, skipped {skip_count} unchanged")

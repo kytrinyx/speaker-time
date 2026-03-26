@@ -1,7 +1,7 @@
 import os
 
 from .cue import Cue
-from .segment import Segment, clean
+from .segment import clean
 from .punctuation_split import PunctuationSplit
 from .silence_split import SilenceSplit
 from .mecab_split import MecabSplit
@@ -9,9 +9,6 @@ from .spacy_split import SpacySplit
 from . import fragment_merger
 from .fragment_merger import MAX_CHARS as MERGE_MAX_CHARS
 from . import paths
-
-MAX_CHARS = {"ko": 45, "default": 80}
-
 
 class OllamaSplit:
     """Ask a local Ollama model where to split a word list by index, then slice directly."""
@@ -147,21 +144,6 @@ class OllamaSplit:
         return cues if cues else [Cue(segment.start, segment.end, segment.text)]
 
 
-def merge_short_cues(cues, threshold):
-    """Merge adjacent cues if their combined length fits within the threshold."""
-    if not cues:
-        return cues
-    result = [cues[0]]
-    for cue in cues[1:]:
-        prev = result[-1]
-        merged_text = prev.text + " " + cue.text
-        if len(merged_text) <= threshold:
-            result[-1] = Cue(prev.start, cue.end, merged_text)
-        else:
-            result.append(cue)
-    return result
-
-
 class SegmentSplitter:
     """Orchestrate all splitters and merge into subtitle cues.
 
@@ -255,39 +237,3 @@ class SegmentSplitter:
         return False
 
 
-class HybridSplit:
-    """Punctuation split first; ollama sub-splits cues that are still too long; merge short fragments."""
-
-    def __init__(self, max_chars_by_lang=None, model="exaone3.5:latest", cache_path=None, episode_id=None):
-        self.max_chars_by_lang = max_chars_by_lang if max_chars_by_lang is not None else MAX_CHARS
-        self._punct = PunctuationSplit()
-        if cache_path is None and episode_id is not None:
-            cache_path = paths.segment_breakpoints(episode_id)
-        self._ollama = OllamaSplit(model=model, cache_path=cache_path)
-        parts = ", ".join(f"{k}={v}" for k, v in self.max_chars_by_lang.items())
-        self.name = f"hybrid({parts})"
-
-    def split(self, segment):
-        cues = self._punct.split(segment)
-
-        # Sub-split any cue that's still over the threshold
-        expanded = []
-        for cue in cues:
-            threshold = self.max_chars_by_lang.get(segment.language, self.max_chars_by_lang["default"])
-            if len(cue.text) > threshold:
-                cue_words = [w for w in segment.words
-                             if w.end > cue.start and w.start < cue.end]
-                mini = Segment(
-                    id=segment.id,
-                    start=cue.start,
-                    end=cue.end,
-                    raw_text=cue.text,
-                    language=segment.language,
-                    words=cue_words,
-                )
-                sub_cues = self._ollama.split(mini)
-                expanded.extend(merge_short_cues(sub_cues, threshold))
-            else:
-                expanded.append(cue)
-
-        return expanded

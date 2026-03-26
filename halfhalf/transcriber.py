@@ -2,7 +2,7 @@ import signal
 import whisper
 import torch
 
-from .segment_splitter import MAX_CHARS
+from .fragment_merger import MAX_CHARS
 
 
 class Transcriber:
