@@ -3,24 +3,34 @@ import spacy
 from .punctuation_split import normalize
 
 
+def _chars_to_after_indices(char_positions, word_spans):
+    """Map char positions to space-word 'after' indices (split before char_pos)."""
+    after_indices = []
+    for char_pos in char_positions:
+        for i, (start, end) in enumerate(word_spans):
+            if start <= char_pos < end:
+                if i > 0:
+                    after_indices.append(i - 1)
+                break
+    return after_indices
+
+
 def _find_split_space_indices(text, nlp):
-    """Return list of space-word 'after' indices at which to split.
+    """Return {'standard': [...], 'weak': [...]} of space-word 'after' indices.
 
     A result value of s means: split after space-word s (new chunk starts at s+1).
 
-    Splits before the first token of:
-    - cc whose head is a VERB — coordinating conjunction joining clauses
-    - mark — subordinating conjunction
-    - prep whose head is a VERB or AUX — prepositional phrase modifying a verb
-    - relcl — relative clause
-    - advcl — adverbial clause modifier
-    - xcomp — open clausal complement
-    - ccomp — clausal complement
-    - npadvmod — noun phrase adverbial modifier
+    standard — strong clause boundaries:
+      - cc whose head is a VERB (coordinating conjunction joining clauses)
+      - mark (subordinating conjunction)
+
+    weak — finer-grained phrase boundaries (prefer to merge, used when fragments are long):
+      - prep whose head is a VERB or AUX
+      - relcl, advcl, xcomp, ccomp, npadvmod
     """
     raw_words = text.split()
     if len(raw_words) <= 1:
-        return []
+        return {'standard': [], 'weak': []}
 
     word_spans = []
     search_from = 0
@@ -30,29 +40,23 @@ def _find_split_space_indices(text, nlp):
         search_from = idx + len(word)
 
     doc = nlp(text)
-    split_char_positions = []
+    standard_chars = []
+    weak_chars = []
 
     for token in doc:
         if token.dep_ == 'cc' and token.head.pos_ == 'VERB':
-            split_char_positions.append(token.idx)
+            standard_chars.append(token.idx)
         elif token.dep_ == 'mark':
-            split_char_positions.append(token.idx)
+            standard_chars.append(token.idx)
         elif token.dep_ == 'prep' and token.head.pos_ in ('VERB', 'AUX'):
-            split_char_positions.append(token.idx)
+            weak_chars.append(token.idx)
         elif token.dep_ in ('relcl', 'advcl', 'xcomp', 'ccomp', 'npadvmod'):
-            split_char_positions.append(token.left_edge.idx)
+            weak_chars.append(token.left_edge.idx)
 
-    after_indices = []
-    for char_pos in split_char_positions:
-        w_idx = None
-        for i, (start, end) in enumerate(word_spans):
-            if start <= char_pos < end:
-                w_idx = i
-                break
-        if w_idx is not None and w_idx > 0:
-            after_indices.append(w_idx - 1)
-
-    return sorted(set(after_indices))
+    return {
+        'standard': sorted(set(_chars_to_after_indices(standard_chars, word_spans))),
+        'weak': sorted(set(_chars_to_after_indices(weak_chars, word_spans))),
+    }
 
 
 def _space_to_whisper_indices(space_indices, raw_text, whisper_words):
@@ -113,15 +117,23 @@ class SpacySplit:
         return self._nlp
 
     def find_splits(self, segment):
-        """Return word indices into segment.words where new chunks begin."""
+        """Return {'strong': [], 'standard': [...], 'weak': [...]} of word indices.
+
+        Index i means "start a new chunk at segment.words[i]".
+        standard — strong clause boundaries (cc+VERB, mark)
+        weak     — finer-grained phrase boundaries (prep, relcl, advcl, xcomp, ccomp, npadvmod)
+        """
+        empty = {'strong': [], 'standard': [], 'weak': []}
         if segment.language != 'en':
-            return []
+            return empty
 
         if not segment.words:
-            return []
+            return empty
 
-        space_indices = _find_split_space_indices(segment.raw_text, self._get_nlp())
-        if not space_indices:
-            return []
+        space_result = _find_split_space_indices(segment.raw_text, self._get_nlp())
 
-        return sorted(set(_space_to_whisper_indices(space_indices, segment.raw_text, segment.words)))
+        return {
+            'strong': [],
+            'standard': sorted(set(_space_to_whisper_indices(space_result['standard'], segment.raw_text, segment.words))),
+            'weak': sorted(set(_space_to_whisper_indices(space_result['weak'], segment.raw_text, segment.words))),
+        }

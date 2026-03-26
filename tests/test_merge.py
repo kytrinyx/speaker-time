@@ -1,5 +1,5 @@
 from halfhalf.segment import Segment, Word
-from halfhalf.merge import Merge
+from halfhalf.merge import FragmentMerger
 
 
 def seg(text, language, words):
@@ -8,8 +8,8 @@ def seg(text, language, words):
     return Segment(id=1, start=start, end=end, raw_text=text, language=language, words=words)
 
 
-def merge(segment, split_indices, mandatory_indices=None):
-    return Merge().merge(segment, split_indices, mandatory_indices or [])
+def merge(segment, split_indices, strong_indices=None, weak_indices=None):
+    return FragmentMerger().merge(segment, split_indices, strong_indices or [], weak_indices or [])
 
 
 # --- No splits ---
@@ -120,7 +120,7 @@ def test_mandatory_boundary_prevents_pairing():
         Word(" are", 1.0, 1.5),
         Word(" you", 1.5, 2.0),
     ])
-    result = merge(s, split_indices=[2], mandatory_indices=[2])
+    result = merge(s, split_indices=[2], strong_indices=[2])
     assert len(result) == 2
 
 
@@ -138,7 +138,7 @@ def test_three_chunks_first_brief_mandatory_after_second():
         Word(" are", 1.0, 1.5),
         Word(" you", 1.5, 2.0),
     ])
-    result = merge(s, split_indices=[2, 4], mandatory_indices=[4])
+    result = merge(s, split_indices=[2, 4], strong_indices=[4])
     assert len(result) == 2
     assert "\n" in result[0].text   # paired
     assert "\n" not in result[1].text  # single
@@ -164,6 +164,43 @@ def test_single_cue_timestamps():
     result = merge(s, [])
     assert result[0].start == 0.5
     assert result[0].end == 3.0
+
+
+# --- Rebalancing ---
+
+# --- Weak boundary ---
+
+def test_weak_boundary_merges_if_fits():
+    # Fragments "hello there" + "my friend" fit within char limit → merged into one
+    s = seg("hello there my friend", "en", [
+        Word(" hello", 0.0, 0.5),
+        Word(" there", 0.5, 1.0),
+        Word(" my", 1.0, 1.5),
+        Word(" friend", 1.5, 2.0),
+    ])
+    result = merge(s, split_indices=[2], weak_indices=[2])
+    assert len(result) == 1
+    assert "\n" not in result[0].text
+
+def test_weak_boundary_not_merged_if_exceeds_char_limit():
+    long = "가나다라마바사아자차카타파하가나다라마바사아자"  # 23 chars > Korean limit of 22
+    s = seg("안녕 " + long, "ko", [
+        Word("안녕", 0.0, 0.5),
+        Word(" " + long, 0.5, 1.5),
+    ])
+    result = merge(s, split_indices=[1], weak_indices=[1])
+    assert len(result) == 2
+
+def test_weak_boundary_not_merged_across_strong():
+    # weak split coincides with strong split → strong wins, no merge
+    s = seg("hello there my friend", "en", [
+        Word(" hello", 0.0, 0.5),
+        Word(" there", 0.5, 1.0),
+        Word(" my", 1.0, 1.5),
+        Word(" friend", 1.5, 2.0),
+    ])
+    result = merge(s, split_indices=[2], strong_indices=[2], weak_indices=[2])
+    assert len(result) == 2
 
 
 # --- Rebalancing ---
