@@ -112,7 +112,7 @@ class HybridSplit:
 
     def __init__(self, max_chars_by_lang=None, model="exaone3.5:latest", cache_path=None, episode_id=None):
         self.max_chars_by_lang = max_chars_by_lang if max_chars_by_lang is not None else MAX_CHARS
-        self._punct = PunctuationSplit(max_chars_by_lang=self.max_chars_by_lang)
+        self._punct = PunctuationSplit()
         if cache_path is None and episode_id is not None:
             cache_path = paths.segment_breakpoints(episode_id)
         self._ollama = OllamaSplit(model=model, cache_path=cache_path)

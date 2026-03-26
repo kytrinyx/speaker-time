@@ -21,19 +21,19 @@ class PunctuationSplit:
 
     name = "punctuation"
 
-    def split(self, segment):
+    def find_splits(self, segment):
+        """Return word indices into segment.words where new chunks begin."""
         if not segment.words:
-            return [Cue(segment.start, segment.end, segment.text)]
+            return []
 
         chunks = split_text_at_punctuation(segment.raw_text)
         if len(chunks) <= 1:
-            return [Cue(segment.start, segment.end, segment.text)]
+            return []
 
-        # Build normalized concatenation of all word tokens for cursor alignment
         full_norm = normalize("".join(w.text for w in segment.words))
-
-        cues = []
-        cursor = 0  # position in full_norm
+        splits = []
+        cursor = 0
+        first_chunk = True
 
         for chunk in chunks:
             chunk_norm = normalize(chunk)
@@ -42,25 +42,39 @@ class PunctuationSplit:
 
             pos = full_norm.find(chunk_norm, cursor)
             if pos == -1:
-                pos = cursor  # fallback: use current position
+                pos = cursor
             end_pos = pos + len(chunk_norm)
 
-            # Collect words whose normalized span overlaps [pos, end_pos)
-            char_pos = 0
-            chunk_words = []
-            for w in segment.words:
-                w_norm = normalize(w.text)
-                w_start, w_end = char_pos, char_pos + len(w_norm)
-                if w_end > pos and w_start < end_pos:
-                    chunk_words.append(w)
-                char_pos = w_end
+            if not first_chunk:
+                char_pos = 0
+                for w_idx, w in enumerate(segment.words):
+                    w_norm = normalize(w.text)
+                    if char_pos + len(w_norm) > pos:
+                        splits.append(w_idx)
+                        break
+                    char_pos += len(w_norm)
 
-            if chunk_words:
-                cleaned = clean(chunk, segment.language)
-                if cleaned:
-                    cues.append(Cue(chunk_words[0].start, chunk_words[-1].end, cleaned))
+            first_chunk = False
             cursor = end_pos
 
-        if not cues:
+        return splits
+
+    def split(self, segment):
+        if not segment.words:
             return [Cue(segment.start, segment.end, segment.text)]
-        return cues
+
+        indices = self.find_splits(segment)
+        if not indices:
+            return [Cue(segment.start, segment.end, segment.text)]
+
+        boundaries = [0] + indices + [len(segment.words)]
+        cues = []
+        for start, end in zip(boundaries, boundaries[1:]):
+            chunk = segment.words[start:end]
+            if chunk:
+                text = "".join(w.text for w in chunk).strip()
+                cleaned = clean(text, segment.language)
+                if cleaned:
+                    cues.append(Cue(chunk[0].start, chunk[-1].end, cleaned))
+
+        return cues if cues else [Cue(segment.start, segment.end, segment.text)]
