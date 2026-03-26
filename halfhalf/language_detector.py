@@ -86,7 +86,7 @@ class SerialLanguageDetector:
         for segment in self._segments[:5]:
             result = detect_file_language(segment.audio_path, model)
             self.log.append({"path": segment.audio_path, **result})
-            if result["confidence"] >= self.CONFIDENCE_THRESHOLD:
+            if result["confidence"] >= CONFIDENCE_THRESHOLD:
                 return result["language"]
 
     def write_log(self, path):
@@ -127,7 +127,7 @@ class ConcatenatingLanguageDetector:
         result = detect_file_language(output_path, model)
         self.log.append({"path": output_path, **result})
 
-        if result["confidence"] >= self.CONFIDENCE_THRESHOLD:
+        if result["confidence"] >= CONFIDENCE_THRESHOLD:
             return result["language"]
         return None
 
