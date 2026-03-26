@@ -88,10 +88,23 @@ def translate_chunk(lines, source_lang, target_lang, cohost, log_path, bad_json_
     try:
         result = json.loads(text)
     except json.JSONDecodeError:
-        os.makedirs(os.path.dirname(bad_json_path), exist_ok=True)
-        with open(bad_json_path, "w") as f:
-            f.write(text)
-        raise
+        from json_repair import repair_json
+        result = repair_json(text, return_objects=True)
+        # flatten list-of-lists (e.g. stray ] split the array into segments)
+        if isinstance(result, list) and any(isinstance(el, list) for el in result):
+            flat = []
+            for el in result:
+                if isinstance(el, list):
+                    flat.extend(el)
+                elif isinstance(el, dict):
+                    flat.append(el)
+            result = flat
+        if not (isinstance(result, list) and all(isinstance(el, dict) for el in result)):
+            os.makedirs(os.path.dirname(bad_json_path), exist_ok=True)
+            with open(bad_json_path, "w") as f:
+                f.write(text)
+            raise
+        print(f"  Repaired JSON ({len(result)} items recovered)")
 
     seen_ids = set()
     duplicate_ids = set()
@@ -135,7 +148,7 @@ def translate_lines(lines, source_lang, target_lang, cohost, cache_file, log_pat
     logs_dir = os.path.dirname(log_path)
     for idx, chunk in enumerate(chunks):
         print(f"  Chunk {idx + 1}/{len(chunks)} ({len(chunk)} lines)...")
-        bad_json_path = os.path.join(logs_dir, f"translation.{idx + 1}.bad.json")
+        bad_json_path = os.path.join(logs_dir, f"translation.{source_lang}-{target_lang}.{idx + 1}.bad.json")
         try:
             translated = translate_chunk(chunk, source_lang, target_lang, cohost, log_path, bad_json_path)
         except json.JSONDecodeError:
@@ -191,9 +204,6 @@ def main():
                 cache = json.load(f)
 
         if all(line in cache for line in lines):
-            if os.path.exists(output_file):
-                print(f"Skipping {source_lang}->{target_lang} (complete)")
-                continue
             print(f"Writing {source_lang}->{target_lang} from cache")
             write_vtt(cues, [cache[line] for line in lines], output_file)
             shutil.copy(output_file, subtitles_dir)
