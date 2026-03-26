@@ -3,7 +3,7 @@ import spacy
 
 from halfhalf.segment import Segment
 from halfhalf.word import Word
-from halfhalf.spacy_split import SpacySplit, _find_split_space_indices
+from halfhalf.spacy_split import SpacySplit, _find_split_space_indices, _space_to_whisper_indices
 
 _nlp = spacy.load("en_core_web_sm")
 
@@ -25,6 +25,16 @@ def test_splits_on_but():
     result = _find_split_space_indices("She likes apples but hates oranges", _nlp)
     assert 2 in result['standard']
 
+def test_splits_on_cc_with_noun_head():
+    # "or" is cc with head "movies" (NOUN) → standard split after space-word 1 ("movies")
+    result = _find_split_space_indices("like movies or TV shows or anything", _nlp)
+    assert 1 in result['standard']
+
+def test_splits_on_cc_with_aux_head():
+    # "and" is cc with head=was (AUX, copula) → standard split after space-word 5 ("accident")
+    result = _find_split_space_indices("it was a complete accident and it was not their fault", _nlp)
+    assert 4 in result['standard']
+
 def test_splits_on_mark_if():
     # "if" is mark → standard split after space-word 2 ("go")
     result = _find_split_space_indices("We can go if you want", _nlp)
@@ -42,10 +52,10 @@ def test_no_split_simple_sentence():
     result = _find_split_space_indices("I like coffee", _nlp)
     assert result == {'standard': [], 'weak': []}
 
-def test_no_split_cc_with_noun_head():
-    # "and" joins nouns, not verbs — no standard split, but may have weak splits
+def test_splits_on_cc_with_noun_head_simple():
+    # "and" is cc with head "cats" (NOUN) → standard split after space-word 0 ("cats")
     result = _find_split_space_indices("cats and dogs", _nlp)
-    assert result['standard'] == []
+    assert 0 in result['standard']
 
 
 # --- SpacySplit.find_splits ---
@@ -96,6 +106,42 @@ def test_english_with_mark_returns_whisper_index_in_standard():
     ])
     result = SpacySplit().find_splits(s)
     assert 3 in result['standard']
+
+def test_space_to_whisper_second_occurrence():
+    # "ranand" appears twice in full_norm; splits at space-words 1 and 4 must map
+    # to distinct Whisper words (2 and 5), not both to word 2 (the first match).
+    whisper_words = [
+        Word('she', 0.0, 0.2),
+        Word(' ran', 0.2, 0.5),
+        Word(' and', 0.5, 0.7),
+        Word(' she', 0.7, 0.9),
+        Word(' ran', 0.9, 1.2),
+        Word(' and', 1.2, 1.4),
+        Word(' she', 1.4, 1.6),
+        Word(' stopped', 1.6, 2.0),
+    ]
+    result = _space_to_whisper_indices([1, 4], 'she ran and she ran and she stopped', whisper_words)
+    assert result == [2, 5]
+
+def test_weak_split_prep_noun_head():
+    # "about" is prep with head "things" (NOUN) → weak split after space-word 3 ("things")
+    result = _find_split_space_indices("I might know things about developers", _nlp)
+    assert 3 in result['weak']
+
+def test_weak_split_prep_adj_head():
+    # "with" is prep with head "familiar" (ADJ) → weak split after space-word 1 ("familiar")
+    result = _find_split_space_indices("more familiar with the people", _nlp)
+    assert 1 in result['weak']
+
+def test_weak_split_intj_verb_head():
+    # "like" is intj with head "flip" (VERB) → weak split after space-word 2 ("anymore")
+    result = _find_split_space_indices("enjoy it anymore like I will just flip a switch", _nlp)
+    assert 2 in result['weak']
+
+def test_weak_split_acl():
+    # "listening" is acl modifying "everybody" → weak split after space-word 1 ("everybody")
+    result = _find_split_space_indices("probably everybody listening has different opinions", _nlp)
+    assert 1 in result['weak']
 
 def test_cc_not_falsely_matched_as_substring():
     # "and" appears inside "cando" (can+do) in the normalized whisper stream —

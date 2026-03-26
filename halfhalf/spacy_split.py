@@ -21,12 +21,13 @@ def _find_split_space_indices(text, nlp):
     A result value of s means: split after space-word s (new chunk starts at s+1).
 
     standard — strong clause boundaries:
-      - cc whose head is a VERB (coordinating conjunction joining clauses)
+      - cc whose head is a VERB, AUX, or NOUN (coordinating conjunction)
       - mark (subordinating conjunction)
 
     weak — finer-grained phrase boundaries (prefer to merge, used when fragments are long):
-      - prep whose head is a VERB or AUX
+      - prep whose head is a VERB, AUX, NOUN, or ADJ
       - relcl, advcl, xcomp, ccomp, npadvmod
+      - intj (discourse marker like "like") whose head is a VERB or AUX
     """
     raw_words = text.split()
     if len(raw_words) <= 1:
@@ -44,14 +45,16 @@ def _find_split_space_indices(text, nlp):
     weak_chars = []
 
     for token in doc:
-        if token.dep_ == 'cc' and token.head.pos_ == 'VERB':
+        if token.dep_ == 'cc' and token.head.pos_ in ('VERB', 'AUX', 'NOUN'):
             standard_chars.append(token.idx)
         elif token.dep_ == 'mark':
             standard_chars.append(token.idx)
-        elif token.dep_ == 'prep' and token.head.pos_ in ('VERB', 'AUX'):
+        elif token.dep_ == 'prep' and token.head.pos_ in ('VERB', 'AUX', 'NOUN', 'ADJ'):
             weak_chars.append(token.idx)
-        elif token.dep_ in ('relcl', 'advcl', 'xcomp', 'ccomp', 'npadvmod'):
+        elif token.dep_ in ('relcl', 'acl', 'advcl', 'xcomp', 'ccomp', 'npadvmod'):
             weak_chars.append(token.left_edge.idx)
+        elif token.dep_ == 'intj' and token.head.pos_ in ('VERB', 'AUX'):
+            weak_chars.append(token.idx)
 
     return {
         'standard': sorted(set(_chars_to_after_indices(standard_chars, word_spans))),
@@ -70,21 +73,26 @@ def _space_to_whisper_indices(space_indices, raw_text, whisper_words):
     full_norm = normalize("".join(w.text for w in whisper_words))
 
     result = []
+    search_start = 0
     for s in space_indices:
         if s + 1 >= len(raw_words):
             continue
 
         # Use two-word context to avoid false substring matches on short words
-        # e.g. "and" alone matches inside "cando" (from "can"+"do"), but "doand" does not
+        # e.g. "and" alone matches inside "cando" (from "can"+"do"), but "doand" does not.
+        # search_start advances monotonically so repeated identical contexts (e.g. "wantto"
+        # appearing twice) map to distinct Whisper words instead of both hitting the first.
         context = normalize(raw_words[s] + raw_words[s + 1])
         offset = len(normalize(raw_words[s]))
-        pos = full_norm.find(context)
+        pos = full_norm.find(context, search_start)
         if pos == -1:
-            pos = full_norm.find(normalize(raw_words[s + 1]))
+            pos = full_norm.find(normalize(raw_words[s + 1]), search_start)
             if pos == -1:
                 continue
         else:
             pos += offset
+
+        search_start = pos
 
         char_pos = 0
         for w_idx, w in enumerate(whisper_words):

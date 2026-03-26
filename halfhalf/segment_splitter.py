@@ -199,18 +199,20 @@ class SegmentSplitter:
         silence_result = self._silence.find_splits(segment)
         strong_splits = silence_result['strong']
         silence_standard = silence_result['standard']
-        mecab_splits = self._mecab.find_splits(segment)
+        mecab_result = self._mecab.find_splits(segment)
+        mecab_standard = mecab_result['standard']
+        mecab_weak = mecab_result['weak']
         spacy_result = self._spacy.find_splits(segment)
         spacy_standard = spacy_result['standard']
-        weak_splits = spacy_result['weak']
+        weak_splits = sorted(set(spacy_result['weak'] + mecab_weak))
 
         if self.verbose and is_long:
             print(f"  PUNCT:    {punct_splits} → {self._fragments(segment, punct_splits)}")
             print(f"  SILENCE:  strong={strong_splits} standard={silence_standard}")
-            print(f"  MECAB:    {mecab_splits}")
-            print(f"  SPACY:    standard={spacy_standard} weak={weak_splits}")
+            print(f"  MECAB:    standard={mecab_standard} weak={mecab_weak}")
+            print(f"  SPACY:    standard={spacy_standard} weak={spacy_result['weak']}")
 
-        all_splits = sorted(set(punct_splits + silence_standard + mecab_splits + spacy_standard + weak_splits))
+        all_splits = sorted(set(punct_splits + silence_standard + mecab_standard + spacy_standard + weak_splits))
 
         if self.verbose and is_long:
             print(f"  COMBINED: {all_splits} → {self._fragments(segment, all_splits)}")
