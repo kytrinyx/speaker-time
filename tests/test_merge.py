@@ -8,8 +8,8 @@ def seg(text, language, words):
     return Segment(id=1, start=start, end=end, raw_text=text, language=language, words=words)
 
 
-def merge(segment, split_indices, strong_indices=None, weak_indices=None):
-    return FragmentMerger().merge(segment, split_indices, strong_indices or [], weak_indices or [])
+def merge(segment, split_indices, strong_indices=None, weak_indices=None, max_chars_by_lang=None):
+    return FragmentMerger(max_chars_by_lang=max_chars_by_lang).merge(segment, split_indices, strong_indices or [], weak_indices or [])
 
 
 # --- No splits ---
@@ -103,7 +103,7 @@ def test_weak_boundary_not_merged_if_exceeds_char_limit():
         Word("안녕", 0.0, 0.5),
         Word(" " + long, 0.5, 1.5),
     ])
-    result = merge(s, split_indices=[1], weak_indices=[1])
+    result = merge(s, split_indices=[1], weak_indices=[1], max_chars_by_lang={"ko": 22, "default": 50})
     assert len(result) == 2
 
 def test_weak_boundary_not_merged_across_strong():
