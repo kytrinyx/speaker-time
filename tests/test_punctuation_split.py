@@ -50,6 +50,22 @@ def test_splits_on_question_mark():
     assert len(cues) == 2
 
 
+def test_splits_on_comma():
+    s = seg("one small caveat, and I've said this", "en", [
+        Word(" one", 0.0, 0.3),
+        Word(" small", 0.3, 0.6),
+        Word(" caveat,", 0.6, 1.0),
+        Word(" and", 1.1, 1.3),
+        Word(" I've", 1.3, 1.6),
+        Word(" said", 1.6, 1.9),
+        Word(" this", 1.9, 2.2),
+    ])
+    cues = PunctuationSplit().split(s)
+    assert len(cues) == 2
+    assert cues[0].text == "one small caveat,"
+    assert cues[1].text == "and I've said this"
+
+
 def test_splits_on_exclamation_mark():
     s = seg("잘했어요! 정말 대단해요.", "ko", [
         Word(" 잘했어요!", 0.0, 1.0),

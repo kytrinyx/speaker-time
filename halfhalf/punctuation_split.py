@@ -11,8 +11,8 @@ def normalize(s):
 
 
 def split_text_at_punctuation(text):
-    """Split text at sentence boundaries - punctuation followed by whitespace or end of string."""
-    parts = re.split(r'(?<=[.?!])(?=\s|$)', text.strip())
+    """Split text at punctuation followed by whitespace or end of string."""
+    parts = re.split(r'(?<=[.?!,])(?=\s|$)', text.strip())
     return [p.strip() for p in parts if p.strip()]
 
 
