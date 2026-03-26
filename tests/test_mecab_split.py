@@ -84,3 +84,14 @@ def test_multiple_ec_splits():
         Word(' 모르겠어요', 1.5, 2.0),
     ])
     assert MecabSplit().find_splits(s) == [1, 2, 3]
+
+def test_ec_not_falsely_matched_as_substring():
+    # split after 했고 (space-word 1) → new chunk starts at second '다' (Whisper word 2)
+    # '다' is short enough that full_norm.find('다') hits the first '다' (word 0) instead
+    s = seg('다 했고 다 됐어요', 'ko', [
+        Word('다', 0.0, 0.3),
+        Word(' 했고', 0.3, 0.7),
+        Word(' 다', 0.7, 1.0),
+        Word(' 됐어요', 1.0, 1.5),
+    ])
+    assert MecabSplit().find_splits(s) == [2]

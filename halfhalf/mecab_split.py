@@ -70,15 +70,19 @@ def _space_to_whisper_indices(space_indices, raw_text, whisper_words):
 
     result = []
     for s in space_indices:
-        # The next chunk starts at raw_words[s+1]
-        chunk_start_norm = normalize(" ".join(raw_words[s + 1:]))
-        if not chunk_start_norm:
+        if s + 1 >= len(raw_words):
             continue
 
-        # Find where this chunk starts in the normalized whisper stream
-        pos = full_norm.find(normalize(raw_words[s + 1]))
+        # Use two-word context to avoid false substring matches on short words
+        context = normalize(raw_words[s] + raw_words[s + 1])
+        offset = len(normalize(raw_words[s]))
+        pos = full_norm.find(context)
         if pos == -1:
-            continue
+            pos = full_norm.find(normalize(raw_words[s + 1]))
+            if pos == -1:
+                continue
+        else:
+            pos += offset
 
         char_pos = 0
         for w_idx, w in enumerate(whisper_words):
