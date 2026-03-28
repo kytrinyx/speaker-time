@@ -3,13 +3,8 @@ from typing import Optional
 
 from . import artifacts
 from . import language
+from .corrections import SegmentOverride
 from .word import Word  # noqa: F401 — re-exported for callers that import Word from here
-
-
-@dataclass
-class Override:
-    source: str
-    text: str
 
 
 @dataclass
@@ -22,7 +17,7 @@ class Segment:
     confidence: float = 0.0
     speaker_id: str = ""
     words: list = field(default_factory=list)
-    override: Optional[Override] = None
+    override: Optional[SegmentOverride] = None
 
     @classmethod
     def from_dict(cls, row, override=None):

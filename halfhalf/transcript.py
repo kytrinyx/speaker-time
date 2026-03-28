@@ -2,7 +2,8 @@ import csv
 import json
 import os
 
-from .segment import Segment, Override
+from .corrections import SegmentSegmentOverride
+from .segment import Segment
 from . import paths
 
 FIELDNAMES = ['speaker_id', 'segment_id', 'start_time', 'end_time', 'text', 'language', 'confidence']
@@ -14,7 +15,7 @@ class Transcript:
         self.path = paths.transcription_csv(episode_id)
         self._corrections_path = paths.cue_overrides(episode_id)
         self._rows = {}  # {(segment_id, language): row}
-        self._overrides = {}  # {segment_id: Override}
+        self._overrides = {}  # {segment_id: SegmentOverride}
 
     @classmethod
     def load(cls, episode_id):
@@ -30,7 +31,7 @@ class Transcript:
                 data = json.load(f)
                 for sequence in data.values():
                     for seg_id, override in sequence["corrections"].items():
-                        t._overrides[int(seg_id)] = Override(
+                        t._overrides[int(seg_id)] = SegmentOverride(
                             source=override["source"], text=override["text"]
                         )
         return t

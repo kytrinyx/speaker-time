@@ -2,6 +2,15 @@
 # Ordered: longer/more-specific patterns must come before shorter ones
 # to avoid partial-match interference.
 
+from dataclasses import dataclass
+
+
+@dataclass
+class SegmentOverride:
+    source: str
+    text: str
+
+
 _CORRECTIONS = [
     # Podcast name variants (하프앤하프)
     ("아프의 나프의", "하프앤하프"),
