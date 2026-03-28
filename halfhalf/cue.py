@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .segment import language_from_text
+from . import language
 
 
 @dataclass
@@ -18,7 +18,7 @@ class Cue:
 
     @property
     def language(self):
-        return language_from_text(self.text)
+        return language.of_text(self.text)
 
     def __str__(self):
         return f"{self.format_timestamp(self.start)} --> {self.format_timestamp(self.end)}\n{self.text}"

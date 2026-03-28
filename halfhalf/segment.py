@@ -2,14 +2,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
+from . import language
 from .corrections import apply as apply_corrections
 from .word import Word  # noqa: F401 — re-exported for callers that import Word from here
-
-
-def language_from_text(text):
-    ascii_count = sum(1 for c in text if c.isascii() and c.isalpha())
-    hangul_count = sum(1 for c in text if '\uAC00' <= c <= '\uD7A3' or '\u1100' <= c <= '\u11FF' or '\u3130' <= c <= '\u318F')
-    return 'ko' if hangul_count >= ascii_count else 'en'
 
 
 @dataclass
@@ -79,7 +74,7 @@ class Segment:
 
     @property
     def derived_language(self):
-        return language_from_text(self.text)
+        return language.of_text(self.text)
 
     def low_confidence(self):
         return self.confidence < -1.5
