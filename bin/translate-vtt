@@ -4,13 +4,15 @@ import sys
 import os
 import json
 import shutil
+import time
 import urllib.request
 import urllib.error
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from halfhalf.captions import Captions
 from halfhalf.cue import Cue
-from halfhalf.prompts import cohost_for
+from halfhalf.prompts import cohost_for, translate_ko_en, translate_en_ko
 from halfhalf import paths
 
 
@@ -19,69 +21,50 @@ REPLICATE_API_URL = f"https://api.replicate.com/v1/models/{REPLICATE_MODEL}/pred
 CHUNK_SIZE = 100
 
 
-def call_replicate(system, user):
+def call_replicate(user):
     api_key = os.environ.get("REPLICATE_API_TOKEN")
     if not api_key:
         print("Error: REPLICATE_API_TOKEN environment variable not set")
         sys.exit(1)
 
-    payload = json.dumps({
-        "input": {
-            "prompt": user,
-            "system_prompt": system,
-            "max_tokens": 4096,
-        }
-    }).encode("utf-8")
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
 
-    req = urllib.request.Request(
-        REPLICATE_API_URL,
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Prefer": "wait",
-        },
-        method="POST",
-    )
-
+    payload = json.dumps({"input": {"prompt": user, "max_tokens": 16384}}).encode("utf-8")
+    req = urllib.request.Request(REPLICATE_API_URL, data=payload, headers=headers, method="POST")
     with urllib.request.urlopen(req) as resp:
         data = json.loads(resp.read().decode("utf-8"))
 
-    return "".join(data["output"])
+    prediction_id = data["id"]
+    poll_url = f"https://api.replicate.com/v1/predictions/{prediction_id}"
+
+    while True:
+        req = urllib.request.Request(poll_url, headers=headers)
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        status = data["status"]
+        if status == "succeeded":
+            return "".join(data["output"])
+        elif status == "failed":
+            raise RuntimeError(f"Replicate prediction failed: {data.get('error')}")
+
+        time.sleep(1)
 
 
 def translate_chunk(lines, source_lang, target_lang, cohost, log_path, bad_json_path):
     payload = [{"id": i + 1, "text": text} for i, text in enumerate(lines)]
     n = len(lines)
 
+    payload_json = json.dumps(payload, ensure_ascii=False)
     if source_lang == "ko" and target_lang == "en":
-        system = (
-            f"You are translating Korean subtitles to English for the Half & Half (하프앤하프) podcast. "
-            f"The hosts are {cohost} and 정태웅 (also called 태웅쌤). "
-            f"Translate each subtitle naturally. Short fragments and sentence continuations are normal in subtitles — translate them as-is without combining them. "
-            f"If a line is context-less filler or untranslatable back-channeling (e.g. '음', '네', '어'), return an empty string for that line. "
-            f"Return a JSON array of objects with 'id' and 'text' fields. No explanation, no backticks."
-        )
-        user = (
-            f"Translate these {n} Korean subtitle lines to English. "
-            f"Return exactly {n} objects, one per input line, preserving all ids.\n\n"
-            + json.dumps(payload, ensure_ascii=False)
-        )
+        user = translate_ko_en(cohost, n, payload_json)
     else:
-        system = (
-            f"You are translating English subtitles to Korean for the Half & Half (하프앤하프) podcast. "
-            f"The hosts are {cohost} and 정태웅 (also called 태웅쌤). "
-            f"Translate each subtitle naturally. Short fragments and sentence continuations are normal in subtitles — translate them as-is without combining them. "
-            f"If a line is context-less filler or untranslatable back-channeling (e.g. 'uh', 'um', 'hmm'), return an empty string for that line. "
-            f"Return a JSON array of objects with 'id' and 'text' fields. No explanation, no backticks."
-        )
-        user = (
-            f"Translate these {n} English subtitle lines to Korean. "
-            f"Return exactly {n} objects, one per input line, preserving all ids.\n\n"
-            + json.dumps(payload, ensure_ascii=False)
-        )
+        user = translate_en_ko(cohost, n, payload_json)
 
-    text = call_replicate(system, user).strip()
+    text = call_replicate(user).strip()
     if text.startswith("```"):
         text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
 
@@ -119,20 +102,26 @@ def translate_chunk(lines, source_lang, target_lang, cohost, log_path, bad_json_
     missing = sorted(expected_ids - set(translated.keys()))
 
     if duplicate_ids or missing:
+        mismatch_parts = []
+        if duplicate_ids:
+            mismatch_parts.append(f"duplicate ids (skipped): {sorted(duplicate_ids)}")
+        if missing:
+            mismatch_parts.append(f"missing ids: {missing}")
+        mismatch_parts.append(f"sent {n} lines, got {len(result)} back")
+        log_entry = {
+            "payload": payload,
+            "response": result,
+            "mismatch": "; ".join(mismatch_parts),
+        }
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
         with open(log_path, "w") as f:
-            if duplicate_ids:
-                f.write(f"duplicate ids (skipped): {sorted(duplicate_ids)}\n")
-            if missing:
-                f.write(f"missing ids: {missing}\n")
-            f.write(f"\n--- sent payload ---\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n")
-            f.write(f"\n--- raw response ---\n{text}\n")
+            json.dump(log_entry, f, ensure_ascii=False, indent=2)
         raise ValueError(f"chunk mismatch (see {log_path})")
 
     return [translated[i + 1] for i in range(n)]
 
 
-def translate_lines(lines, source_lang, target_lang, cohost, cache_file, log_path):
+def translate_lines(lines, source_lang, target_lang, cohost, cache_file, log_path, ts):
     cache = {}
     if os.path.exists(cache_file):
         with open(cache_file) as f:
@@ -148,7 +137,7 @@ def translate_lines(lines, source_lang, target_lang, cohost, cache_file, log_pat
     logs_dir = os.path.dirname(log_path)
     for idx, chunk in enumerate(chunks):
         print(f"  Chunk {idx + 1}/{len(chunks)} ({len(chunk)} lines)...")
-        bad_json_path = os.path.join(logs_dir, f"translation.{source_lang}-{target_lang}.{idx + 1}.bad.json")
+        bad_json_path = os.path.join(logs_dir, f"translation.{source_lang}-{target_lang}.{idx + 1}.{ts}.bad.json")
         try:
             translated = translate_chunk(chunk, source_lang, target_lang, cohost, log_path, bad_json_path)
         except json.JSONDecodeError:
@@ -163,7 +152,7 @@ def translate_lines(lines, source_lang, target_lang, cohost, cache_file, log_pat
         with open(cache_file, "w") as f:
             json.dump(cache, f, ensure_ascii=False)
 
-    return [cache.get(line, "") for line in lines]
+    return [cache.get(line) for line in lines]
 
 
 def write_vtt(cues, translated_texts, path):
@@ -190,13 +179,14 @@ def main():
     subtitles_dir = os.environ.get("HALF_AND_HALF_SUBTITLES_DIR", os.path.expanduser("~/Desktop/"))
 
     all_cues = list(Captions.load(episode_id))
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
 
     for source_lang, target_lang in (("ko", "en"), ("en", "ko")):
         output_file = paths.vtt_file(episode_id, source_lang, target_lang)
         cues = [c for c in all_cues if c.language == source_lang]
         lines = [c.text for c in cues]
         cache_file = paths.translation_cache(episode_id, source_lang, target_lang)
-        log_path = os.path.join(paths.logs_dir(episode_id), f"translate-{source_lang}-{target_lang}.log")
+        log_path = os.path.join(paths.logs_dir(episode_id), f"translate-{source_lang}-{target_lang}.{ts}.json")
 
         cache = {}
         if os.path.exists(cache_file):
@@ -210,7 +200,13 @@ def main():
             continue
 
         print(f"Translating {source_lang}->{target_lang} ({len(lines)} lines)")
-        translated = translate_lines(lines, source_lang, target_lang, cohost, cache_file, log_path)
+        translated = translate_lines(lines, source_lang, target_lang, cohost, cache_file, log_path, ts)
+
+        missing_count = sum(1 for t in translated if t is None)
+        if missing_count:
+            print(f"  Skipping {source_lang}->{target_lang} VTT: {missing_count}/{len(lines)} lines missing")
+            continue
+
         write_vtt(cues, translated, output_file)
 
         print(f"Translation written: {output_file}")
