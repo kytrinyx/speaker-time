@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from .cue import Cue
-from .segment import clean
+from . import artifacts
 
 
 MAX_CHARS = {"ko": 30, "en": 50, "default": 50}
@@ -71,7 +71,7 @@ class FragmentMerger:
                 if next_boundary in strong_set or next_boundary not in weak_set:
                     break
                 next_end_word = boundaries[i + 2]
-                combined_text = clean("".join(w.text for w in words[chunk_start_word:next_end_word]).strip(), lang)
+                combined_text = artifacts.fixup("".join(w.text for w in words[chunk_start_word:next_end_word]).strip(), lang)
                 if len(combined_text) <= char_limit:
                     parts[-1] = (parts[-1][0], 'weak')
                     parts.append((words[chunk_end_word:next_end_word], None))
@@ -104,7 +104,7 @@ class FragmentMerger:
             if chunk.boundary == 'ordinary' and result:
                 prev = result[-1]
                 all_words = [w for pw, _ in prev.parts for w in pw] + [w for pw, _ in chunk.parts for w in pw]
-                combined_text = clean("".join(w.text for w in all_words).strip(), lang)
+                combined_text = artifacts.fixup("".join(w.text for w in all_words).strip(), lang)
                 if len(combined_text) <= char_limit:
                     new_parts = prev.parts[:-1] + [(prev.parts[-1][0], 'ordinary')] + chunk.parts
                     result[-1] = MergedChunk(
@@ -130,7 +130,7 @@ class FragmentMerger:
         for chunk in self._plan():
             pieces = []
             for part_words, boundary_after in chunk.parts:
-                t = clean("".join(w.text for w in part_words).strip(), seg.language)
+                t = artifacts.fixup("".join(w.text for w in part_words).strip(), seg.language)
                 if t:
                     pieces.append(t)
                     if boundary_after:
@@ -156,10 +156,10 @@ class FragmentMerger:
         result = []
         for chunk in self._plan():
             all_words = [w for part_words, _ in chunk.parts for w in part_words]
-            text = clean("".join(w.text for w in all_words).strip(), lang)
+            text = artifacts.fixup("".join(w.text for w in all_words).strip(), lang)
             if text:
                 if self.verbose and len(chunk.parts) > 1:
-                    part_texts = [clean("".join(w.text for w in pw).strip(), lang) for pw, _ in chunk.parts]
+                    part_texts = [artifacts.fixup("".join(w.text for w in pw).strip(), lang) for pw, _ in chunk.parts]
                     print(f"    WEAK MERGE: " + " + ".join(f"{t!r}" for t in part_texts if t))
                 if self.verbose:
                     print(f"    CUE: {text!r}")

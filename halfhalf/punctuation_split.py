@@ -1,7 +1,7 @@
 import re
 
 from .cue import Cue
-from .segment import clean
+from . import artifacts
 from .split_utils import normalize
 
 
@@ -68,7 +68,7 @@ class PunctuationSplit:
             chunk = segment.words[start:end]
             if chunk:
                 text = "".join(w.text for w in chunk).strip()
-                cleaned = clean(text, segment.language)
+                cleaned = artifacts.fixup(text, segment.language)
                 if cleaned:
                     cues.append(Cue(chunk[0].start, chunk[-1].end, cleaned))
 

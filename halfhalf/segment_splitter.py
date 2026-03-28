@@ -1,5 +1,5 @@
 from .cue import Cue
-from .segment import clean
+from . import artifacts
 from .punctuation_split import PunctuationSplit
 from .silence_split import SilenceSplit
 from .mecab_split import MecabSplit
@@ -89,7 +89,7 @@ class SegmentSplitter:
         for start, end in zip(boundaries, boundaries[1:]):
             chunk = words[start:end]
             if chunk:
-                result.append(clean("".join(w.text for w in chunk).strip(), segment.language))
+                result.append(artifacts.fixup("".join(w.text for w in chunk).strip(), segment.language))
         return result
 
     def _any_fragment_too_long(self, segment, split_indices, char_limit):
@@ -97,7 +97,7 @@ class SegmentSplitter:
         boundaries = [0] + list(split_indices) + [len(words)]
         for start, end in zip(boundaries, boundaries[1:]):
             chunk = words[start:end]
-            if chunk and len(clean("".join(w.text for w in chunk).strip(), segment.language)) > char_limit:
+            if chunk and len(artifacts.fixup("".join(w.text for w in chunk).strip(), segment.language)) > char_limit:
                 return True
         return False
 
