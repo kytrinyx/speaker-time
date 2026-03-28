@@ -18,6 +18,13 @@ class Segment:
     speaker_id: str = ""
     words: list = field(default_factory=list)
     override: Optional[SegmentOverride] = None
+    text: str = field(init=False)
+
+    def __post_init__(self):
+        if self.override and self.override.source == self.cleaned_text:
+            self.text = self.override.text
+        else:
+            self.text = self.cleaned_text
 
     @classmethod
     def from_dict(cls, row, override=None):
@@ -35,12 +42,6 @@ class Segment:
     @property
     def cleaned_text(self):
         return artifacts.fixup(self.raw_text, self.language)
-
-    @property
-    def text(self):
-        if self.override and self.override.source == self.cleaned_text:
-            return self.override.text
-        return self.cleaned_text
 
     @property
     def derived_language(self):
