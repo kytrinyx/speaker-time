@@ -13,7 +13,7 @@ class Transcript:
     def __init__(self, episode_id):
         self.episode_id = episode_id
         self.path = paths.transcription_csv(episode_id)
-        self._corrections_path = paths.cue_overrides(episode_id)
+        self._corrections_path = paths.segment_overrides(episode_id)
         self._rows = {}  # {(segment_id, language): row}
         self._overrides = {}  # {segment_id: SegmentOverride}
 

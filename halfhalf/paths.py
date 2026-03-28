@@ -29,8 +29,8 @@ def words_csv(episode_id):
     return os.path.join("output", episode_id, "data", "words.csv")
 
 
-def cue_overrides(episode_id):
-    return os.path.join("output", episode_id, "data", "cue-overrides.json")
+def segment_overrides(episode_id):
+    return os.path.join("output", episode_id, "data", "segment-overrides.json")
 
 
 def split_segment_cues(episode_id):
