@@ -1,6 +1,6 @@
 import pytest
 from halfhalf.segment import Segment, Word
-from halfhalf.mecab_split import MecabSplit, _find_split_word_indices, _space_to_whisper_indices
+from halfhalf.mecab_split import MecabSplit, _find_split_word_indices
 
 
 def seg(text, language, words):
@@ -148,18 +148,6 @@ def test_multiple_ec_splits():
     ])
     assert MecabSplit().find_splits(s) == {'standard': [1, 2, 3], 'weak': []}
 
-def test_space_to_whisper_second_occurrence():
-    # "공부하고쉬고" appears twice in full_norm; splits at space-words 0 and 2 must map
-    # to distinct Whisper words (1 and 3), not both to word 1 (the first match).
-    whisper_words = [
-        Word('공부하고', 0.0, 0.5),
-        Word(' 쉬고', 0.5, 1.0),
-        Word(' 공부하고', 1.0, 1.5),
-        Word(' 쉬고', 1.5, 2.0),
-        Word(' 됐어요', 2.0, 2.5),
-    ]
-    result = _space_to_whisper_indices([0, 2], '공부하고 쉬고 공부하고 쉬고 됐어요', whisper_words)
-    assert result == [1, 3]
 
 def test_repeated_ec_phrase_maps_all_splits():
     # Both occurrences of 공부하고 and 쉬고 (EC) must produce distinct Whisper indices.

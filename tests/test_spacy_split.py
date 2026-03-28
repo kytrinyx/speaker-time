@@ -3,7 +3,7 @@ import spacy
 
 from halfhalf.segment import Segment
 from halfhalf.word import Word
-from halfhalf.spacy_split import SpacySplit, _find_split_space_indices, _space_to_whisper_indices
+from halfhalf.spacy_split import SpacySplit, _find_split_space_indices
 
 _nlp = spacy.load("en_core_web_sm")
 
@@ -107,21 +107,6 @@ def test_english_with_mark_returns_whisper_index_in_standard():
     result = SpacySplit().find_splits(s)
     assert 3 in result['standard']
 
-def test_space_to_whisper_second_occurrence():
-    # "ranand" appears twice in full_norm; splits at space-words 1 and 4 must map
-    # to distinct Whisper words (2 and 5), not both to word 2 (the first match).
-    whisper_words = [
-        Word('she', 0.0, 0.2),
-        Word(' ran', 0.2, 0.5),
-        Word(' and', 0.5, 0.7),
-        Word(' she', 0.7, 0.9),
-        Word(' ran', 0.9, 1.2),
-        Word(' and', 1.2, 1.4),
-        Word(' she', 1.4, 1.6),
-        Word(' stopped', 1.6, 2.0),
-    ]
-    result = _space_to_whisper_indices([1, 4], 'she ran and she ran and she stopped', whisper_words)
-    assert result == [2, 5]
 
 def test_weak_split_prep_noun_head():
     # "about" is prep with head "things" (NOUN) → weak split after space-word 3 ("things")

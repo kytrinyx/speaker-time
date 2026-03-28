@@ -1,13 +1,8 @@
 import re
-import unicodedata
 
 from .cue import Cue
 from .segment import clean
-
-
-def normalize(s):
-    s = unicodedata.normalize("NFC", s)
-    return ''.join(c for c in s if not unicodedata.category(c).startswith('P') and not c.isspace()).lower()
+from .split_utils import normalize
 
 
 def split_text_at_punctuation(text):
