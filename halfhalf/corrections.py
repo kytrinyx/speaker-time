@@ -2,7 +2,7 @@
 # Ordered: longer/more-specific patterns must come before shorter ones
 # to avoid partial-match interference.
 
-CORRECTIONS = [
+_CORRECTIONS = [
     # Podcast name variants (하프앤하프)
     ("아프의 나프의", "하프앤하프"),
     ("하프이나 부의", "하프앤하프"),
@@ -79,6 +79,6 @@ CORRECTIONS = [
 
 
 def apply(text):
-    for bad, good in CORRECTIONS:
+    for bad, good in _CORRECTIONS:
         text = text.replace(bad, good)
     return text

@@ -1,6 +1,6 @@
 import re
 
-from .corrections import apply as apply_corrections
+from . import corrections
 
 
 def _collapse(text, language):
@@ -20,7 +20,7 @@ def fixup(text, language):
     t = text.strip()
     if t == "[TIMEOUT]":
         return ""
-    t = apply_corrections(t).strip()
+    t = corrections.apply(t).strip()
     t = _collapse(t, language)
     if not t or _is_filler(t, language):
         return ""
