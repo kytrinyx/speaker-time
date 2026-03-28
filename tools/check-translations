@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+# Check which episodes have incomplete translation caches.
+
+import sys
+import os
+import json
+import glob
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from halfhalf.captions import Captions
+from halfhalf import paths
+
+output_dir = "output"
+patterns = ["jeep-*", "katrina-*", "ian-*"]
+
+basenames = []
+for pattern in patterns:
+    matches = glob.glob(os.path.join(output_dir, pattern))
+    basenames.extend(os.path.basename(m) for m in matches if os.path.isdir(m))
+basenames.sort()
+
+basenames = [b for b in basenames if os.path.exists(paths.timeline_csv(b))]
+
+for episode_id in basenames:
+    all_cues = list(Captions.load(episode_id))
+    incomplete = False
+    for source_lang, target_lang in (("ko", "en"), ("en", "ko")):
+        cache_file = paths.translation_cache(episode_id, source_lang, target_lang)
+        cache = {}
+        if os.path.exists(cache_file):
+            with open(cache_file) as f:
+                cache = json.load(f)
+        lines = [c.text for c in all_cues if c.language == source_lang]
+        if any(line not in cache for line in lines):
+            incomplete = True
+            break
+    if incomplete:
+        print(episode_id)
