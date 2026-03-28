@@ -20,7 +20,7 @@ def fixup(text, language):
     t = text.strip()
     if t == "[TIMEOUT]":
         return ""
-    t = corrections.apply(t).strip()
+    t = corrections.substitute(t).strip()
     t = _collapse(t, language)
     if not t or _is_filler(t, language):
         return ""

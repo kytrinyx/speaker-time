@@ -78,7 +78,7 @@ _CORRECTIONS = [
 ]
 
 
-def apply(text):
+def substitute(text):
     for bad, good in _CORRECTIONS:
         text = text.replace(bad, good)
     return text
