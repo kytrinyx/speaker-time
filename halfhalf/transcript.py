@@ -2,7 +2,7 @@ import csv
 import json
 import os
 
-from .corrections import SegmentSegmentOverride
+from .corrections import SegmentOverride
 from .segment import Segment
 from . import paths
 
