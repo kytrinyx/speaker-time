@@ -67,8 +67,20 @@ def segment_breakpoints(episode_id):
     return os.path.join("output", episode_id, "data", "segment-breakpoints.json")
 
 
+def llm_splits_json(episode_id):
+    return os.path.join("output", episode_id, "data", "llm-splits.json")
+
+
 def translation_cache(episode_id, source_lang, target_lang):
     return os.path.join("output", episode_id, "data", f"translation.{source_lang}-{target_lang}.cache.json")
+
+
+def translations_json(episode_id):
+    return os.path.join("output", episode_id, "data", "translations.json")
+
+
+def transcription_json(episode_id):
+    return os.path.join("output", episode_id, "data", "transcription.json")
 
 
 def silences_csv(episode_id):

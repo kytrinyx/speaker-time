@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from halfhalf.downloader import Downloader
+from halfhalf.stenographer import Stenographer
+from halfhalf.mimeograph import Mimeograph
+from halfhalf.fragment_splitter import FragmentSplitter
+from halfhalf.translator import Translator
+from halfhalf.subtitles_generator import SubtitlesGenerator
+from halfhalf.backchannel import is_backchannel
+from halfhalf.prompts import cohost_for
+from halfhalf import paths
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run the Half & Half subtitle pipeline.",
+        usage=(
+            "\n  bin/run --url=<url> --cohost=<name>   # download and process"
+            "\n  bin/run --episode=<episode_id>         # resume existing episode"
+        ),
+    )
+    parser.add_argument("--url", help="YouTube URL to download")
+    parser.add_argument("--cohost", help="Cohost prefix (e.g. jeep, katrina, ian)")
+    parser.add_argument("--episode", help="Existing episode ID to resume from")
+    args = parser.parse_args()
+
+    if args.episode and (args.url or args.cohost):
+        parser.error("Use either --episode or --url/--cohost, not both.")
+    if not args.episode and not (args.url and args.cohost):
+        parser.error("Provide --url and --cohost, or --episode.")
+
+    return args
+
+
+def main():
+    args = parse_args()
+
+    if args.episode:
+        episode_id = args.episode
+        if not os.path.exists(paths.audio_file(episode_id)):
+            print(f"Error: audio file not found for {episode_id}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        print("=== Downloading ===")
+        downloader = Downloader()
+        try:
+            episode_id = downloader.download(args.url, args.cohost)
+        except FileExistsError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        print(f"  Episode: {episode_id}")
+
+    cohost = cohost_for(episode_id)
+
+    print("\n=== Transcribing ===")
+    stenographer = Stenographer()
+    stenographer.transcribe(
+        audio_path=paths.audio_file(episode_id),
+        output_path=paths.transcription_json(episode_id),
+    )
+
+    print("\n=== Splitting into cues ===")
+    mimeograph = Mimeograph.load(paths.transcription_json(episode_id))
+    print(f"  {len(mimeograph)} words, {len(mimeograph.fragments)} fragments")
+    splitter = FragmentSplitter(cache_path=paths.llm_splits_json(episode_id))
+    cues = []
+    for fragment in mimeograph.fragments:
+        cues.extend(splitter.split(fragment))
+    before = len(cues)
+    cues = [c for c in cues if not is_backchannel(c)]
+    print(f"  {len(cues)} cues ({before - len(cues)} backchannels removed)")
+
+    print("\n=== Translating ===")
+    translator = Translator(cohost=cohost, cache_path=paths.translations_json(episode_id))
+    still_missing = translator.translate(cues)
+    total_missing = sum(len(v) for v in still_missing.values())
+    if total_missing:
+        print(f"\n  Warning: {total_missing} cue(s) could not be translated. Run bin/retranslate {episode_id} to retry.")
+
+    print("\n=== Generating subtitles ===")
+    generator = SubtitlesGenerator(episode_id, cues, translator)
+    generator.generate()
+
+    print(f"\n=== Done ===")
+    print(f"\n{episode_id}")
+
+
+if __name__ == "__main__":
+    main()

@@ -15,7 +15,7 @@ def translate_ko_en(cohost, n, payload):
     return (
         f"You are translating Korean subtitles to English for the Half & Half (하프앤하프) podcast. "
         f"The hosts are {cohost} and 정태웅 (also called 태웅쌤). "
-        f"If a line is context-less filler or untranslatable back-channeling (e.g. '음', '네', '어'), return an empty string for that line. "
+        f"If a line consists entirely of phonetic back-channeling with no other content (e.g. '음', '네', '어'), return an empty string for that line. All other lines — including sentence fragments — must be translated. "
         f"Return a JSON array of objects with 'id' and 'text' fields. No explanation, no backticks.\n\n"
         f"Translate these {n} Korean subtitle lines to English. "
         f"CRITICAL: Do NOT merge or combine lines. Each input line maps to exactly one output object — even fragments, even one-word lines. "
@@ -28,7 +28,7 @@ def translate_en_ko(cohost, n, payload):
     return (
         f"You are translating English subtitles to Korean for the Half & Half (하프앤하프) podcast. "
         f"The hosts are {cohost} and 정태웅 (also called 태웅쌤). "
-        f"If a line is context-less filler or untranslatable back-channeling (e.g. 'uh', 'um', 'hmm'), return an empty string for that line. "
+        f"If a line consists entirely of phonetic back-channeling with no other content (e.g. 'uh', 'um', 'hmm'), return an empty string for that line. All other lines — including sentence fragments — must be translated. "
         f"Return a JSON array of objects with 'id' and 'text' fields. No explanation, no backticks.\n\n"
         f"Translate these {n} English subtitle lines to Korean. "
         f"CRITICAL: Do NOT merge or combine lines. Each input line maps to exactly one output object — even fragments, even one-word lines. "
