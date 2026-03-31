@@ -1,109 +1,94 @@
 #!/usr/bin/env python3
 
+import argparse
 import sys
 import os
-import json
-import shutil
-import datetime
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from halfhalf.transcript import Transcript
-from halfhalf.prompts import build_prompts
-from halfhalf.transcriber import Transcriber
-from halfhalf.words import Words
-from halfhalf.timeline import Timeline
+from halfhalf.downloader import Downloader
+from halfhalf.stenographer import Stenographer
+from halfhalf.mimeograph import Mimeograph
+from halfhalf.fragment_splitter import FragmentSplitter
+from halfhalf.translator import Translator
+from halfhalf.subtitles_generator import SubtitlesGenerator
+from halfhalf.backchannel import is_backchannel
+from halfhalf.prompts import cohost_for
 from halfhalf import paths
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run the Half & Half subtitle pipeline.",
+        usage=(
+            "\n  bin/run --url=<url> --cohost=<name>   # download and process"
+            "\n  bin/run --episode=<episode_id>         # resume existing episode"
+        ),
+    )
+    parser.add_argument("--url", help="YouTube URL to download")
+    parser.add_argument("--cohost", help="Cohost prefix (e.g. jeep, katrina, ian)")
+    parser.add_argument("--episode", help="Existing episode ID to resume from")
+    args = parser.parse_args()
+
+    if args.episode and (args.url or args.cohost):
+        parser.error("Use either --episode or --url/--cohost, not both.")
+    if not args.episode and not (args.url and args.cohost):
+        parser.error("Provide --url and --cohost, or --episode.")
+
+    return args
+
+
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: transcribe <episode_id>")
-        sys.exit(1)
+    args = parse_args()
 
-    episode_id = sys.argv[1]
-    prompts = build_prompts(episode_id)
-
-    output_dir = paths.episode_dir(episode_id)
-    timeline_file = paths.timeline_csv(episode_id)
-    metadata_file = paths.metadata_json(episode_id)
-    audio_dir = paths.audio_dir(episode_id)
-
-    if not os.path.exists(timeline_file):
-        print(f"Error: Timeline CSV not found: {timeline_file}")
-        print("Run 'diarize' first to generate the timeline.")
-        sys.exit(1)
-
-    if not os.path.exists(audio_dir):
-        print(f"Error: Audio segments directory not found: {audio_dir}")
-        print("Run 'cut-audio' first to generate audio segments.")
-        sys.exit(1)
-
-    speaker_languages = {}
-    speaker_skip = {}
-    if os.path.exists(metadata_file):
-        with open(metadata_file, 'r') as f:
-            metadata = json.load(f)
-            for speaker, data in metadata.items():
-                if not isinstance(data, dict):
-                    continue
-                speaker_languages[speaker] = data.get("language", "en")
-                speaker_skip[speaker] = data.get("skip", False)
-
-    timeline = Timeline.load(episode_id)
-    transcript = Transcript.load(episode_id)
-    words_csv = Words.load(paths.words_csv(episode_id))
-
-    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    backups_dir = paths.backups_dir(episode_id)
-    if os.path.exists(transcript.path) or os.path.exists(words_csv.path):
-        os.makedirs(backups_dir, exist_ok=True)
-    if os.path.exists(transcript.path):
-        backup = os.path.join(backups_dir, f"bk.{timestamp}.transcription.csv")
-        shutil.copy2(transcript.path, backup)
-        print(f"Backed up transcription.csv to backups/{os.path.basename(backup)}")
-    if os.path.exists(words_csv.path):
-        backup = os.path.join(backups_dir, f"bk.{timestamp}.words.csv")
-        shutil.copy2(words_csv.path, backup)
-        print(f"Backed up words.csv to backups/{os.path.basename(backup)}")
-
-    transcriber = Transcriber(prompts, transcript, words_csv)
-
-    print("Transcribing audio segments...")
-    transcribed_count = 0
-
-    for seg in timeline:
-        if speaker_skip.get(seg.speaker_id, False):
-            continue
-        language = speaker_languages.get(seg.speaker_id, "en")
-
-        if not transcriber.needs_transcription(seg.segment_id, language):
-            continue
-
-        if not os.path.exists(seg.audio_path):
-            print(f"Warning: Audio segment {seg.audio_path} not found")
-            continue
-
-        print(f"Transcribing segment {seg.segment_id:06d} ({seg.speaker_id})...")
+    if args.episode:
+        episode_id = args.episode
+        if not os.path.exists(paths.audio_file(episode_id)):
+            print(f"Error: audio file not found for {episode_id}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        print("=== Downloading ===")
+        downloader = Downloader()
         try:
-            rows, words = transcriber.transcribe_segment(
-                seg.audio_path, seg.segment_id, seg.speaker_id, language,
-                seg.start, seg.end,
-            )
-        except Exception as e:
-            print(f"Error transcribing segment {seg.segment_id:06d}: {e}")
-            continue
+            episode_id = downloader.download(args.url, args.cohost)
+        except FileExistsError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        print(f"  Episode: {episode_id}")
 
-        for row in rows:
-            transcript.upsert(row)
-        transcript.save()
+    cohost = cohost_for(episode_id)
 
-        languages = {row['language'] for row in rows}
-        words_csv.upsert_segment(seg.segment_id, words, languages)
-        words_csv.save()
+    print("\n=== Transcribing ===")
+    stenographer = Stenographer()
+    stenographer.transcribe(
+        audio_path=paths.audio_file(episode_id),
+        output_path=paths.transcription_json(episode_id),
+    )
 
-        transcribed_count += 1
+    print("\n=== Splitting into cues ===")
+    mimeograph = Mimeograph.load(paths.transcription_json(episode_id))
+    print(f"  {len(mimeograph)} words, {len(mimeograph.fragments)} fragments")
+    splitter = FragmentSplitter(cache_path=paths.llm_splits_json(episode_id))
+    cues = []
+    for fragment in mimeograph.fragments:
+        cues.extend(splitter.split(fragment))
+    before = len(cues)
+    cues = [c for c in cues if not is_backchannel(c)]
+    print(f"  {len(cues)} cues ({before - len(cues)} backchannels removed)")
 
-    print(f"Transcription saved to: {transcript.path}")
-    print(f"Transcribed {transcribed_count} new segments")
+    print("\n=== Translating ===")
+    translator = Translator(cohost=cohost, cache_path=paths.translations_json(episode_id))
+    still_missing = translator.translate(cues)
+    total_missing = sum(len(v) for v in still_missing.values())
+    if total_missing:
+        print(f"\n  Warning: {total_missing} cue(s) could not be translated. Run bin/retranslate {episode_id} to retry.")
+
+    print("\n=== Generating subtitles ===")
+    generator = SubtitlesGenerator(episode_id, cues, translator)
+    generator.generate()
+
+    print(f"\n=== Done ===")
+    print(f"\n{episode_id}")
+
 
 if __name__ == "__main__":
     main()
