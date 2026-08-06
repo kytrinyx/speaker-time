@@ -1,0 +1,13 @@
+[project]
+name = "half-and-half-subtitles"
+version = "0.1.0"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "click",
+    "elevenlabs",
+    "json-repair",
+    "mecab-ko",
+    "pytest",
+    "spacy",
+    "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+]

@@ -6,6 +6,46 @@ Subtitle generation pipeline for a bilingual Korean/English podcast.
 
 The pipeline downloads a YouTube episode, transcribes it with ElevenLabs Scribe, splits the transcript into subtitle cues using an LLM, translates each cue, and writes four VTT files.
 
+## Setup
+
+**Prerequisites (brew):**
+
+```
+brew install yt-dlp mecab-ko
+```
+
+**Python dependencies:**
+
+```
+uv sync
+```
+
+This installs all Python dependencies (including the spacy model) into a local `.venv` using Python 3.13.
+
+**API keys:**
+
+Copy `.env.example` to `.env` and fill in your keys:
+
+```
+cp .env.example .env
+```
+
+You'll need a [Replicate](https://replicate.com) API token (`REPLICATE_API_TOKEN`) and an [ElevenLabs](https://elevenlabs.io) API token (`ELEVENLABS_API_TOKEN`).
+
+**Run commands:**
+
+Either activate the venv first:
+
+```
+source .venv/bin/activate
+```
+
+Or prefix commands with `uv run`:
+
+```
+uv run bin/transcribe --url=<youtube-url> --cohost=<name>
+```
+
 ## Usage
 
 **New episode** (download + process):
